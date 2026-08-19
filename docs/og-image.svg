@@ -1,51 +1,64 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="1200">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
   <defs>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#090d16"/>
+      <stop offset="50%" stop-color="#0f172a"/>
       <stop offset="100%" stop-color="#1e293b"/>
     </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="10" stdDeviation="15" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
   </defs>
   
   <!-- Background -->
   <rect width="1200" height="630" fill="url(#bg)"/>
   
-  <!-- Decorative Grid Pattern Overlay -->
-  <g stroke="#334155" stroke-opacity="0.3" stroke-width="1">
+  <!-- Subtle Background Grid -->
+  <g stroke="#334155" stroke-opacity="0.2" stroke-width="1">
     <path d="M0 105 h1200 M0 210 h1200 M0 315 h1200 M0 420 h1200 M0 525 h1200"/>
     <path d="M200 0 v630 M400 0 v630 M600 0 v630 M800 0 v630 M1000 0 v630"/>
   </g>
 
-  <!-- Left Side: Terminal / Code Graphic Accent -->
-  <g transform="translate(100, 150)">
-    <rect width="320" height="330" rx="12" fill="#0f172a" stroke="#334155" stroke-width="2"/>
-    <circle cx="25" cy="25" r="6" fill="#ef4444"/>
-    <circle cx="45" cy="25" r="6" fill="#f59e0b"/>
-    <circle cx="65" cy="25" r="6" fill="#22c55e"/>
+  <!-- Centered Main Content Wrapper -->
+  <g transform="translate(100, 115)" filter="url(#shadow)">
+    <!-- Card Container -->
+    <rect width="1000" height="400" rx="24" fill="#0f172a" stroke="#334155" stroke-width="2"/>
     
-    <text x="25" y="75" font-family="monospace" font-size="16" fill="#38bdf8">@article{roy2025direct,</text>
-    <text x="45" y="105" font-family="monospace" font-size="15" fill="#e2e8f0">author = {Roy, Dhiman},</text>
-    <text x="45" y="135" font-family="monospace" font-size="15" fill="#4ade80">title  = {Verified...},</text>
-    <text x="45" y="165" font-family="monospace" font-size="15" fill="#e2e8f0">journal= {J. Fluid Mech.},</text>
-    <text x="45" y="195" font-family="monospace" font-size="15" fill="#e2e8f0">year   = {2025}</text>
-    <text x="25" y="225" font-family="monospace" font-size="16" fill="#38bdf8">}</text>
-    
-    <!-- Floating Check Badge -->
-    <g transform="translate(240, 240)">
-      <circle cx="35" cy="35" r="35" fill="#22c55e"/>
-      <path d="M20 35l10 10 20-20" fill="none" stroke="#ffffff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
-    </g>
-  </g>
+    <!-- Top Accent Bar (VS Code / Terminal style buttons) -->
+    <circle cx="45" cy="45" r="7" fill="#ef4444"/>
+    <circle cx="70" cy="45" r="7" fill="#f59e0b"/>
+    <circle cx="95" cy="45" r="7" fill="#22c55e"/>
 
-  <!-- Right Side: Text Information -->
-  <g transform="translate(480, 230)">
-    <!-- Brand / App Name -->
-    <text x="0" y="0" font-family="system-ui, -apple-system, sans-serif" font-weight="800" font-size="72" fill="#ffffff">fixBib</text>
-    
-    <!-- Subtitle -->
-    <text x="0" y="65" font-family="system-ui, -apple-system, sans-serif" font-weight="500" font-size="28" fill="#38bdf8">Precision BibTeX for Aerospace Research</text>
-    
-    <!-- Description -->
-    <text x="0" y="130" font-family="system-ui, -apple-system, sans-serif" font-weight="400" font-size="18" fill="#94a3b8">Clean, verify, and format references against CrossRef,</text>
-    <text x="0" y="160" font-family="system-ui, -apple-system, sans-serif" font-weight="400" font-size="18" fill="#94a3b8">Semantic Scholar, and OpenAlex. 100% in-browser.</text>
+    <!-- Left Side: Larger Code Snippet Preview -->
+    <g transform="translate(60, 90)">
+      <text x="0" y="0" font-family="monospace" font-size="20" fill="#38bdf8">@article{roy2025direct,</text>
+      <text x="25" y="38" font-family="monospace" font-size="19" fill="#e2e8f0">author = {Roy, Dhiman},</text>
+      <text x="25" y="76" font-family="monospace" font-size="19" fill="#4ade80">title  = {Verified...},</text>
+      <text x="25" y="114" font-family="monospace" font-size="19" fill="#e2e8f0">journal= {J. Fluid Mech.},</text>
+      <text x="25" y="152" font-family="monospace" font-size="19" fill="#e2e8f0">year   = {2025}</text>
+      <text x="0" y="190" font-family="monospace" font-size="20" fill="#38bdf8">}</text>
+      
+      <!-- Checkmark Badge over code -->
+      <g transform="translate(265, 110)">
+        <circle cx="30" cy="30" r="28" fill="#22c55e"/>
+        <path d="M17 30l9 9 17-18" fill="none" stroke="#ffffff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>
+    </g>
+
+    <!-- Vertical Divider Line -->
+    <line x1="470" y1="60" x2="470" y2="340" stroke="#334155" stroke-width="2" stroke-dasharray="6 6"/>
+
+    <!-- Right Side: Big, Bold Typography -->
+    <g transform="translate(530, 115)">
+      <!-- Title -->
+      <text x="0" y="0" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="80" fill="#ffffff" letter-spacing="-1">fixBib</text>
+      
+      <!-- Subtitle -->
+      <text x="0" y="55" font-family="system-ui, -apple-system, sans-serif" font-weight="700" font-size="26" fill="#38bdf8">Precision BibTeX for Aerospace</text>
+      
+      <!-- Description -->
+      <text x="0" y="120" font-family="system-ui, -apple-system, sans-serif" font-weight="400" font-size="20" fill="#94a3b8">Clean, verify, and format references</text>
+      <text x="0" y="150" font-family="system-ui, -apple-system, sans-serif" font-weight="400" font-size="20" fill="#94a3b8">against CrossRef &amp; Semantic Scholar.</text>
+    </g>
   </g>
 </svg>
