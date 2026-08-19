@@ -9,11 +9,16 @@
 
 <br/>
 
-### See it in action
+---
 
-<a href="https://dhimanroy.github.io/fixBib/" title="Try fixBib">
-  <img src="demo/bibtex-verifier-demo.gif" alt="fixBib product demo: format and verify academic references in-browser" width="92%">
-</a>
+## Acknowledgement
+
+This project is based on the original [BibTeX Verifier](https://github.com/merfanian/Bibtex-Verifier) by `merfanian`.
+
+---
+
+### What it does
+
 
 <p align="center">
   <sub><strong>Aerospace Standards</strong> · journal abbreviations · citation keys · field-level corrections · aligned formatting</sub>
@@ -60,34 +65,6 @@ Upload or paste .bib → Parse entries → For each entry:
 
 **Statuses:** **Verified** (matches online record) · **Auto-updated** (same paper, metadata differs) · **Needs review** (weak title match — possible typo) · **Not found** (no index hit).
 
----
-
-## Quick start
-
-### Online (recommended)
-
-**[https://dhimanroy.github.io/fixBib/](https://dhimanroy.github.io/fixBib/)**
-
-### Local
-
-```bash
-git clone https://github.com/dhimanroy/fixBib.git
-cd fixBib
-npx serve docs
-```
-
-Open the URL shown (often `http://localhost:3000`).
-
----
-
-## Project layout
-
-| Path | Role |
-|------|------|
-| `docs/` | GitHub Pages app: `index.html`, `style.css`, `app.js`, `lib.js` |
-| `tests/test_lib.js` | Node unit tests for `lib.js` |
-
----
 
 ## Limitations
 
@@ -97,17 +74,6 @@ Open the URL shown (often `http://localhost:3000`).
 
 ---
 
-## Contributing
-
-Issues and PRs welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the project layout, how to run tests (`npm test`), and the flow.
-
----
-
-## Acknowledgement
-
-This project is based on the original [BibTeX Verifier](https://github.com/merfanian/Bibtex-Verifier) by `merfanian`.
-
----
 
 ## License
 
