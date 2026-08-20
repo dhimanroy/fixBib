@@ -351,6 +351,10 @@ code {
   font-weight: 600;
 }
 
+.hero-lead strong.c-yellow {
+  color: var(--yellow);
+}
+
 @media (max-width: 640px) {
   .hero-overview-toggle {
     display: flex;
@@ -602,6 +606,8 @@ code {
 .badge-review    .summary-dot { background: var(--yellow); }
 .badge-notfound  .summary-dot { background: var(--red); }
 .badge-duplicates .summary-dot { background: var(--purple); }
+.badge-cached     .summary-dot { background: #0ea5e9; }
+.badge-fetched    .summary-dot { background: #10b981; }
 
 /* Active state: tinted background + colored text + colored count chip. */
 .summary-badge.active.badge-verified   { background: var(--accent-bg); color: var(--accent);  border-color: rgba(91, 141, 239, 0.35); }
@@ -609,6 +615,187 @@ code {
 .summary-badge.active.badge-review     { background: var(--yellow-bg); color: var(--yellow);  border-color: var(--yellow-border); }
 .summary-badge.active.badge-notfound   { background: var(--red-bg);    color: var(--red);     border-color: var(--red-border); }
 .summary-badge.active.badge-duplicates { background: var(--purple-bg); color: var(--purple);  border-color: var(--purple-border); }
+.summary-badge.active.badge-cached     { background: rgba(14, 165, 233, 0.15); color: #0ea5e9; border-color: rgba(14, 165, 233, 0.35); }
+.summary-badge.active.badge-fetched    { background: rgba(16, 185, 129, 0.15); color: #10b981; border-color: rgba(16, 185, 129, 0.35); }
+
+/* Storage Stats Chip */
+.storage-stats-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border: 1px dashed var(--border);
+  background: var(--surface-alt);
+  color: var(--text-dim);
+  font-family: inherit;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+}
+
+.storage-stats-chip:hover {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+.storage-stats-chip .chip-icon {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+/* ─── Cache Management Modal ─────────────────────────────────────── */
+.cache-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.cache-modal-backdrop.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.cache-modal {
+  width: 100%;
+  max-width: 440px;
+  background: var(--surface-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+  padding: 1.25rem 1.5rem;
+  transform: translateY(10px) scale(0.97);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cache-modal-backdrop.active .cache-modal {
+  transform: translateY(0) scale(1);
+}
+
+.cache-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.cache-modal-header h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text);
+}
+
+.cache-modal-close {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s, background 0.15s;
+}
+
+.cache-modal-close:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.cache-info-box {
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem;
+  text-align: center;
+  margin-bottom: 0.85rem;
+}
+
+.cache-info-val {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 0.2rem;
+}
+
+.cache-info-sub {
+  font-size: 0.82rem;
+  color: var(--text-dim);
+}
+
+.cache-modal-desc {
+  font-size: 0.84rem;
+  color: var(--text-dim);
+  line-height: 1.45;
+  margin-bottom: 1.25rem;
+}
+
+.cache-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.cache-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1rem;
+  border-radius: 8px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 0.18s ease;
+  font-family: inherit;
+}
+
+.cache-btn-export {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.cache-btn-export:hover {
+  filter: brightness(1.1);
+}
+
+.cache-btn-import {
+  background: var(--surface-card);
+  color: var(--text);
+  border-color: var(--border);
+}
+.cache-btn-import:hover {
+  background: var(--surface-alt);
+  border-color: var(--text-dim);
+}
+
+.cache-btn-clear {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+.cache-btn-clear:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: #ef4444;
+}
 
 [data-theme="light"] .summary-badge.active.badge-verified { border-color: rgba(59, 111, 224, 0.28); }
 
@@ -908,6 +1095,33 @@ code {
 .tag-needs_review { background: var(--yellow-bg); color: var(--yellow); }
 .tag-not_found { background: var(--red-bg); color: var(--red); }
 .tag-duplicate { background: var(--purple-bg); color: var(--purple); }
+.tag-cached { background: rgba(14, 165, 233, 0.15); color: #0ea5e9; border: 1px solid rgba(14, 165, 233, 0.3); }
+
+.btn-refetch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.btn-refetch:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--surface);
+}
+
+.btn-refetch:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
 
 .entry-tags {
   display: flex;

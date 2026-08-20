@@ -418,8 +418,13 @@
 
     if (isAiaa) {
       found._aiaaPaperNum = aiaaPaperNum;
-      if (!found.publisher && !original.publisher) {
-        found.publisher = "AIAA Paper " + aiaaPaperNum;
+      if (found.journal && /(scitech|aviation|aerospace|forum|meeting|conference)/i.test(found.journal)) {
+        if (!found.booktitle) found.booktitle = cleanVenue(found.journal);
+      }
+      found.journal = "";
+      found.publisher = "";
+      if (!found.howpublished && !original.howpublished) {
+        found.howpublished = "AIAA Paper " + aiaaPaperNum;
       }
     }
 
@@ -510,10 +515,11 @@
     if (isAiaa) {
       merged.ENTRYTYPE = "misc";
       merged.howpublished = "AIAA Paper " + aiaaPaperNum;
-      const removeFields = ["journal", "booktitle", "volume", "number", "pages", "publisher"];
-      for (const f of removeFields) {
-        merged[f] = "";
+      if (merged.journal && /(scitech|aviation|aerospace|forum|meeting|conference)/i.test(merged.journal)) {
+        if (!merged.booktitle) merged.booktitle = cleanVenue(merged.journal);
       }
+      merged.journal = "";
+      merged.publisher = "";
     }
 
     for (const field of COMPARED_FIELDS) {
@@ -1285,6 +1291,214 @@
     });
   }
 
+  // ─── Local Caching System ──────────────────────────────────────────
+  const CACHE_PREFIX = "fixBib_";
+
+  function getCacheKey(entry) {
+    if (!entry) return null;
+    const doi = (entry.doi || "").trim().replace(/^https?:\/\/(dx\.)?doi\.org\//i, "");
+    if (doi) {
+      return `${CACHE_PREFIX}doi_${doi.toLowerCase()}`;
+    }
+    const title = (entry.title || "").trim();
+    if (title) {
+      const cleanTitle = title.toLowerCase()
+        .replace(/[\s\-_:;,./?!'"`()\[\]{}]/g, "")
+        .trim();
+      if (cleanTitle) return `${CACHE_PREFIX}title_${cleanTitle}`;
+    }
+    return null;
+  }
+
+  function getFromCache(entry) {
+    if (typeof localStorage === "undefined") return null;
+    const key = getCacheKey(entry);
+    if (!key) return null;
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+      const data = JSON.parse(raw);
+      if (data && typeof data === "object") {
+        return { ...data, isCached: true };
+      }
+    } catch (e) {
+      console.warn("Failed to read from cache:", e);
+    }
+    return null;
+  }
+
+  function saveToCache(originalEntry, resolvedData) {
+    if (typeof localStorage === "undefined" || !resolvedData) return;
+    const key = getCacheKey(originalEntry) || getCacheKey(resolvedData);
+    if (!key) return;
+
+    const minimalPayload = {
+      title: resolvedData.title || "",
+      author: resolvedData.author || "",
+      year: (resolvedData.year || "").toString(),
+      journal: resolvedData.journal || "",
+      booktitle: resolvedData.booktitle || "",
+      volume: resolvedData.volume || "",
+      number: resolvedData.number || "",
+      pages: resolvedData.pages || "",
+      doi: resolvedData.doi || "",
+      publisher: resolvedData.publisher || "",
+      url: resolvedData.url || "",
+      howpublished: resolvedData.howpublished || "",
+      note: resolvedData.note || "",
+      _source: resolvedData._source || "cache",
+      _cachedAt: Date.now(),
+    };
+
+    try {
+      localStorage.setItem(key, JSON.stringify(minimalPayload));
+    } catch (e) {
+      if (e && (e.name === "QuotaExceededError" || e.name === "NS_ERROR_DOM_QUOTA_REACHED")) {
+        console.warn("localStorage quota exceeded. Purging old fixBib cache entries...");
+        purgeOldCache();
+        try {
+          localStorage.setItem(key, JSON.stringify(minimalPayload));
+        } catch (retryErr) {
+          console.error("Failed to save to cache after purge:", retryErr);
+        }
+      }
+    }
+  }
+
+  function purgeOldCache() {
+    if (typeof localStorage === "undefined") return;
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(CACHE_PREFIX)) {
+        keysToRemove.push(k);
+      }
+    }
+    for (const k of keysToRemove) {
+      localStorage.removeItem(k);
+    }
+  }
+
+  function exportCacheData() {
+    if (typeof localStorage === "undefined") return { app: "fixBib", version: "1.0", exportedAt: new Date().toISOString(), count: 0, cache: {} };
+    const cacheObj = {};
+    let count = 0;
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(CACHE_PREFIX)) {
+        try {
+          const raw = localStorage.getItem(k);
+          if (raw) {
+            cacheObj[k] = JSON.parse(raw);
+            count++;
+          }
+        } catch (e) {
+          console.warn(`Skipping invalid cache key ${k} during export:`, e);
+        }
+      }
+    }
+    return {
+      app: "fixBib",
+      version: "1.0",
+      exportedAt: new Date().toISOString(),
+      count,
+      cache: cacheObj,
+    };
+  }
+
+  function sanitizeStringField(val) {
+    if (typeof val !== "string") return "";
+    return val.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "");
+  }
+
+  function validateAndSanitizeCacheData(jsonData) {
+    if (!jsonData || typeof jsonData !== "object" || Array.isArray(jsonData)) {
+      return { valid: false, error: "Invalid JSON format. Expected a JSON object." };
+    }
+
+    const rawMap = jsonData.cache && typeof jsonData.cache === "object" && !Array.isArray(jsonData.cache)
+      ? jsonData.cache
+      : jsonData;
+
+    const sanitizedMap = {};
+    let count = 0;
+
+    for (const [key, val] of Object.entries(rawMap)) {
+      if (typeof key !== "string" || !key.startsWith(CACHE_PREFIX)) continue;
+
+      let itemObj = val;
+      if (typeof val === "string") {
+        try { itemObj = JSON.parse(val); } catch (e) { continue; }
+      }
+      if (!itemObj || typeof itemObj !== "object" || Array.isArray(itemObj)) continue;
+
+      const cleanItem = {
+        title: sanitizeStringField(itemObj.title),
+        author: sanitizeStringField(itemObj.author),
+        year: sanitizeStringField(itemObj.year),
+        journal: sanitizeStringField(itemObj.journal),
+        booktitle: sanitizeStringField(itemObj.booktitle),
+        volume: sanitizeStringField(itemObj.volume),
+        number: sanitizeStringField(itemObj.number),
+        pages: sanitizeStringField(itemObj.pages),
+        publisher: sanitizeStringField(itemObj.publisher),
+        doi: sanitizeStringField(itemObj.doi),
+        url: sanitizeStringField(itemObj.url),
+        howpublished: sanitizeStringField(itemObj.howpublished),
+        note: sanitizeStringField(itemObj.note),
+        ENTRYTYPE: sanitizeStringField(itemObj.ENTRYTYPE),
+        _source: sanitizeStringField(itemObj._source) || "imported-cache",
+        _cachedAt: typeof itemObj._cachedAt === "number" ? itemObj._cachedAt : Date.now(),
+      };
+
+      sanitizedMap[key] = cleanItem;
+      count++;
+    }
+
+    if (count === 0) {
+      return { valid: false, error: "No valid fixBib cache records found in file." };
+    }
+
+    return { valid: true, count, sanitizedCache: sanitizedMap };
+  }
+
+  function importCacheData(jsonData, merge = true) {
+    if (typeof localStorage === "undefined") throw new Error("localStorage is not available.");
+
+    const res = validateAndSanitizeCacheData(jsonData);
+    if (!res.valid) throw new Error(res.error);
+
+    if (!merge) {
+      clearCacheData();
+    }
+
+    let importedCount = 0;
+    for (const [key, item] of Object.entries(res.sanitizedCache)) {
+      try {
+        localStorage.setItem(key, JSON.stringify(item));
+        importedCount++;
+      } catch (e) {
+        console.warn(`Failed to save key ${key} during import:`, e);
+      }
+    }
+    return { importedCount };
+  }
+
+  function clearCacheData() {
+    if (typeof localStorage === "undefined") return 0;
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(CACHE_PREFIX)) {
+        keysToRemove.push(k);
+      }
+    }
+    for (const k of keysToRemove) {
+      localStorage.removeItem(k);
+    }
+    return keysToRemove.length;
+  }
+
   // ─── Public API ──────────────────────────────────────────────────────
   exports.TITLE_MATCH_THRESHOLD = TITLE_MATCH_THRESHOLD;
   exports.MIN_TITLE_SIM = MIN_TITLE_SIM;
@@ -1327,5 +1541,13 @@
   exports.toTitleCase = toTitleCase;
   exports.toSentenceCase = toSentenceCase;
   exports.generateCitationKey = generateCitationKey;
+  exports.getCacheKey = getCacheKey;
+  exports.getFromCache = getFromCache;
+  exports.saveToCache = saveToCache;
+  exports.purgeOldCache = purgeOldCache;
+  exports.exportCacheData = exportCacheData;
+  exports.validateAndSanitizeCacheData = validateAndSanitizeCacheData;
+  exports.importCacheData = importCacheData;
+  exports.clearCacheData = clearCacheData;
 
 })(typeof module !== "undefined" && module.exports ? module.exports : (window.BibLib = {}));

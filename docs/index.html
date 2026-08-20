@@ -77,7 +77,7 @@
           <a href="https://www.semanticscholar.org/" target="_blank">Semantic Scholar</a>, and
           <a href="https://openalex.org/" target="_blank">OpenAlex</a>.
           Select your target publication format (such as <strong>AIAA Journal</strong>, <strong>Journal of Fluid Mechanics</strong>, or <strong>Physics of Fluids</strong>), and fixBib automatically formats publication titles (Title Case vs. Sentence Case), journal names (full titles vs. standard ISO abbreviations), AIAA paper entries (as <code>@misc</code> or <code>@inproceedings</code> with <code>note</code>), preserves full author names, and exports clean, standardized BibTeX.
-          Everything runs 100% in-browser — your bibliography never leaves your machine.</p>
+          Everything runs 100% in-browser — your data <strong class="c-yellow">never leaves your machine</strong> (unless you choose to export it).</p>
       </div>
     </header>
 
@@ -127,6 +127,21 @@
           <span class="summary-label">Duplicates</span>
           <span class="summary-count">0</span>
         </button>
+        <button type="button" class="summary-badge badge-cached active" data-filter="cached">
+          <span class="summary-dot"></span>
+          <span class="summary-label">Cached</span>
+          <span class="summary-count">0</span>
+        </button>
+        <button type="button" class="summary-badge badge-fetched active" data-filter="fetched">
+          <span class="summary-dot"></span>
+          <span class="summary-label">Fetched</span>
+          <span class="summary-count">0</span>
+        </button>
+
+        <div class="storage-stats-chip" id="storage-stats-chip" title="Browser storage &amp; memory usage">
+          <svg class="chip-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+          <span id="storage-stats-label">Cache: 0 KB</span>
+        </div>
         <div class="entry-search" role="search">
           <svg class="entry-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <input type="search" id="entry-search-input" class="entry-search-input" placeholder="Search title or key…" aria-label="Search entries by title or BibTeX key" autocomplete="off" spellcheck="false" />
@@ -187,8 +202,8 @@
         </div>
         <div class="step">
           <div class="step-num">2</div>
-          <h3>Verify</h3>
-          <p>Each entry is looked up by title against Semantic Scholar, CrossRef, and OpenAlex. Authors, year, venue, DOI, and other fields are compared to the published record to correct incomplete or missing data.</p>
+          <h3>Waterfall verification &amp; caching</h3>
+          <p>Each entry is verified via an intelligent API waterfall (CrossRef &rarr; Semantic Scholar &rarr; OpenAlex). Standardized fields are cached locally in your browser so repeat runs execute instantaneously without hitting API rate limits.</p>
         </div>
         <div class="step">
           <div class="step-num">3</div>
@@ -212,8 +227,8 @@
           <div class="feature-icon-wrapper">
             <svg class="feature-card-icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
           </div>
-          <h3>DOI &amp; Online Verification</h3>
-          <p>Verifies entries by DOI or title against CrossRef, Semantic Scholar, and OpenAlex to complete missing DOIs, dates, and volumes.</p>
+          <h3>API Waterfall &amp; Local Caching</h3>
+          <p>Verifies entries using a fast CrossRef &rarr; Semantic Scholar &rarr; OpenAlex waterfall. Caches only essential fields in local storage to eliminate redundant API calls and prevent rate limits.</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon-wrapper">
@@ -341,6 +356,45 @@
       <p class="acknowledgement">Forked from: <a href="https://github.com/merfanian/Bibtex-Verifier" target="_blank" rel="noopener">BibTeX Verifier</a> by merfanian.</p>
     </div>
   </footer>
+
+  <!-- Subtle Cache Management Modal -->
+  <div class="cache-modal-backdrop" id="cache-modal-backdrop">
+    <div class="cache-modal" role="dialog" aria-labelledby="cache-modal-title">
+      <div class="cache-modal-header">
+        <h3 id="cache-modal-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+          Cache &amp; Storage Controls
+        </h3>
+        <button type="button" class="cache-modal-close" id="cache-modal-close" title="Close modal">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="cache-modal-body">
+        <div class="cache-info-box">
+          <div class="cache-info-val" id="modal-cache-size">0 KB</div>
+          <div class="cache-info-sub" id="modal-cache-count">0 entries saved locally</div>
+        </div>
+        <p class="cache-modal-desc">
+          Export your verified reference cache to move it to another device, or import a pre-verified <code>.json</code> cache file.
+        </p>
+        <div class="cache-actions">
+          <button type="button" class="cache-btn cache-btn-export" id="btn-export-cache">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export Cache (.json)
+          </button>
+          <button type="button" class="cache-btn cache-btn-import" id="btn-import-cache">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Import Cache (.json)
+          </button>
+          <button type="button" class="cache-btn cache-btn-clear" id="btn-clear-cache">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            Clear Cache
+          </button>
+        </div>
+        <input type="file" id="cache-file-input" accept=".json" style="display:none" />
+      </div>
+    </div>
+  </div>
 
   <script src="https://unpkg.com/fuzzball@2.2.3/dist/fuzzball.umd.min.js"></script>
   <script src="lib.js"></script>

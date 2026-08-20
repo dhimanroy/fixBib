@@ -11,8 +11,8 @@
   const SS_FIELDS = "title,authors,year,venue,publicationVenue,externalIds";
   const OPENALEX_API = "https://api.openalex.org/works";
   const OPENALEX_FIELDS = "title,display_name,publication_year,doi,ids,authorships,primary_location,biblio,id";
-  const MAX_RETRIES = 4;
-  const RETRY_BASE_MS = 1500;
+  const MAX_RETRIES = 1;
+  const RETRY_BASE_MS = 1000;
 
   // Raised when a lookup can't be completed because a source kept failing
   // transiently (HTTP 429/5xx or network errors) after all retries. It lets
@@ -22,24 +22,40 @@
     constructor(message) { super(message); this.name = "TransientLookupError"; }
   }
 
-  // ─── Adaptive rate controller ──────────────────────────────────────
+  // ─── Adaptive rate controller & Circuit Breakers ───────────────────
   // One independent bucket per source: current delay, its clamps, the last
-  // request time, and a run of consecutive successes used to speed back up.
+  // request time, and consecutive failures used to trip a short-circuit breaker.
   const rateBuckets = {
-    ss: { delay: 500, min: 300, max: 3000, last: 0, ok: 0 },
-    cr: { delay: 100, min: 50,  max: 2000, last: 0, ok: 0 },
-    oa: { delay: 100, min: 50,  max: 2000, last: 0, ok: 0 },
+    ss: { delay: 500, min: 300, max: 3000, last: 0, ok: 0, failures: 0, disabled: false },
+    cr: { delay: 100, min: 50,  max: 2000, last: 0, ok: 0, failures: 0, disabled: false },
+    oa: { delay: 100, min: 50,  max: 2000, last: 0, ok: 0, failures: 0, disabled: false },
   };
 
-  function rateBackoff(source) {
+  function resetCircuitBreakers() {
+    for (const b of Object.values(rateBuckets)) {
+      b.failures = 0;
+      b.disabled = false;
+      b.delay = b.min;
+    }
+  }
+
+  function rateBackoff(source, isRateLimitOrCors = false) {
     const b = rateBuckets[source] || rateBuckets.cr;
     b.delay = Math.min(b.delay * 1.3, b.max);
     b.ok = 0;
+    if (isRateLimitOrCors) {
+      b.failures++;
+      if (b.failures >= 2) {
+        b.disabled = true;
+        console.warn(`Circuit breaker tripped for API source '${source}' due to repeated 429/CORS errors.`);
+      }
+    }
   }
 
   function rateSuccess(source) {
     const b = rateBuckets[source] || rateBuckets.cr;
     b.ok++;
+    b.failures = 0;
     if (b.ok >= 2) {
       b.delay = Math.max(b.delay * 0.85, b.min);
       b.ok = 0;
@@ -50,13 +66,18 @@
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   async function fetchJSON(url, params, { retries = MAX_RETRIES, is404Ok = false } = {}) {
-    const u = new URL(url);
-    for (const [k, v] of Object.entries(params)) u.searchParams.set(k, v);
-
     const source = url.includes("semanticscholar.org") ? "ss"
       : url.includes("openalex.org") ? "oa"
       : "cr";
-    const bucket = rateBuckets[source];
+    const bucket = rateBuckets[source] || rateBuckets.cr;
+
+    if (bucket.disabled) {
+      throw new TransientLookupError(`API source '${source}' is temporarily disabled (rate limit/CORS).`);
+    }
+
+    const u = new URL(url);
+    for (const [k, v] of Object.entries(params)) u.searchParams.set(k, v);
+
     const elapsed = Date.now() - bucket.last;
     if (elapsed < bucket.delay) await sleep(bucket.delay - elapsed);
     bucket.last = Date.now();
@@ -69,30 +90,28 @@
           return resp.json();
         }
         if (resp.status === 404 && is404Ok) return null;
-        // 429 (rate limit) and 5xx (server) are transient: back off, retry, and
-        // ultimately surface as an error so a miss is never faked from congestion.
         if (resp.status === 429 || resp.status >= 500) {
-          rateBackoff(source);
-          if (attempt < retries) {
+          rateBackoff(source, resp.status === 429);
+          if (attempt < retries && !bucket.disabled) {
             const wait = RETRY_BASE_MS * Math.pow(2, attempt);
-            console.warn(`Transient ${resp.status} on attempt ${attempt + 1}, retrying in ${wait}ms...`);
+            console.warn(`Transient ${resp.status} on ${source} attempt ${attempt + 1}, retrying in ${wait}ms...`);
             await sleep(wait);
             continue;
           }
-          throw new TransientLookupError(`HTTP ${resp.status} after ${retries + 1} attempts`);
+          throw new TransientLookupError(`HTTP ${resp.status} after ${attempt + 1} attempt(s)`);
         }
-        // Other 4xx responses are a definitive negative (e.g. empty query).
         return null;
       } catch (err) {
         if (err instanceof TransientLookupError) throw err;
-        rateBackoff(source);
-        if (attempt < retries) {
+        const isCorsOrFetchErr = err instanceof TypeError || /CORS|Failed to fetch/i.test(err.message);
+        rateBackoff(source, isCorsOrFetchErr);
+        if (attempt < retries && !isCorsOrFetchErr && !bucket.disabled) {
           const wait = RETRY_BASE_MS * Math.pow(2, attempt);
-          console.warn(`Request failed (${err.message}), retrying in ${wait}ms...`);
+          console.warn(`Request failed on ${source} (${err.message}), retrying in ${wait}ms...`);
           await sleep(wait);
           continue;
         }
-        throw new TransientLookupError(`Network error after ${retries + 1} attempts: ${err.message}`);
+        throw new TransientLookupError(`Network error on ${source}: ${err.message}`);
       }
     }
     return null;
@@ -112,16 +131,110 @@
 
   async function searchCrossref(title) {
     const data = await fetchJSON(CROSSREF_API, {
-      "query.title": title, rows: "5",
+      "query.bibliographic": title,
+      rows: "5",
+      mailto: "yornamihd@gmail.com",
+      select: "DOI,title,author,issued,container-title,volume,issue,page,publisher,type",
     });
     return (data?.message?.items || []).map(B.crossrefToStandard);
   }
 
   async function searchOpenAlex(title) {
     const data = await fetchJSON(OPENALEX_API, {
-      search: title, per_page: "5", select: OPENALEX_FIELDS,
+      search: title,
+      per_page: "5",
+      select: OPENALEX_FIELDS,
+      mailto: "yornamihd@gmail.com",
     });
     return (data?.results || []).map(B.openAlexToStandard);
+  }
+
+  async function resolveCitation(entry, forceRefetch = false) {
+    if (!entry) return { data: null, networkFetched: false };
+
+    if (!forceRefetch) {
+      const cached = B.getFromCache(entry);
+      if (cached) {
+        return { data: cached, networkFetched: false };
+      }
+    }
+
+    const rawTitle = (entry.title || "").trim();
+    const rawDoi = (entry.doi || "").trim();
+    const cleanTitle = B.stripLatex(rawTitle);
+
+    let transient = false;
+    const attemptStep = async (fn) => {
+      try { return await fn(); }
+      catch (err) {
+        if (err instanceof TransientLookupError) { transient = true; return null; }
+        throw err;
+      }
+    };
+
+    // Step A: CrossRef Primary
+    let crMatch = null;
+    if (rawDoi) {
+      const cleanDoi = rawDoi.replace(/^https?:\/\/(dx\.)?doi\.org\//i, "");
+      crMatch = await attemptStep(async () => {
+        const data = await fetchJSON(`${CROSSREF_API}/${encodeURIComponent(cleanDoi)}`, { mailto: "yornamihd@gmail.com" }, { is404Ok: true });
+        return data?.message ? B.crossrefToStandard(data.message) : null;
+      });
+    }
+    if (!crMatch && cleanTitle) {
+      const crCandidates = (await attemptStep(() => searchCrossref(cleanTitle))) || [];
+      crMatch = B.bestMatch(crCandidates, cleanTitle);
+    }
+
+    if (crMatch && B.titleSimilarity(cleanTitle || rawDoi, crMatch.title || crMatch.doi || "") >= B.MIN_TITLE_SIM) {
+      B.saveToCache(entry, crMatch);
+      return { data: crMatch, networkFetched: true };
+    }
+
+    // Step B: Semantic Scholar Secondary Fallback
+    let ssMatch = null;
+    if (rawDoi) {
+      const cleanDoi = rawDoi.replace(/^https?:\/\/(dx\.)?doi\.org\//i, "");
+      ssMatch = await attemptStep(async () => {
+        const data = await fetchJSON(`${SS_PAPER}/DOI:${encodeURIComponent(cleanDoi)}`, { fields: SS_FIELDS }, { is404Ok: true });
+        return data ? B.ssToStandard(data) : null;
+      });
+    }
+    if (!ssMatch && cleanTitle) {
+      ssMatch = await attemptStep(() => searchSSMatch(cleanTitle));
+    }
+    if (ssMatch && B.titleSimilarity(cleanTitle || rawDoi, ssMatch.title || ssMatch.doi || "") >= B.MIN_TITLE_SIM) {
+      if (crMatch && B.isSamePaper(ssMatch, crMatch)) {
+        ssMatch = B.mergeMetadata(ssMatch, crMatch);
+      }
+      B.saveToCache(entry, ssMatch);
+      return { data: ssMatch, networkFetched: true };
+    }
+
+    // Step C: OpenAlex Final Fallback
+    let oaMatch = null;
+    if (rawDoi) {
+      const cleanDoi = rawDoi.replace(/^https?:\/\/(dx\.)?doi\.org\//i, "");
+      oaMatch = await attemptStep(async () => {
+        const data = await fetchJSON(`${OPENALEX_API}/https://doi.org/${encodeURIComponent(cleanDoi)}`, { select: OPENALEX_FIELDS, mailto: "yornamihd@gmail.com" }, { is404Ok: true });
+        return data ? B.openAlexToStandard(data) : null;
+      });
+    }
+    if (!oaMatch && cleanTitle) {
+      const oaCandidates = (await attemptStep(() => searchOpenAlex(cleanTitle))) || [];
+      oaMatch = B.bestMatch(oaCandidates, cleanTitle);
+    }
+
+    if (oaMatch && B.titleSimilarity(cleanTitle || rawDoi, oaMatch.title || oaMatch.doi || "") >= B.MIN_TITLE_SIM) {
+      let merged = oaMatch;
+      if (crMatch && B.isSamePaper(merged, crMatch)) merged = B.mergeMetadata(merged, crMatch);
+      if (ssMatch && B.isSamePaper(merged, ssMatch)) merged = B.mergeMetadata(merged, ssMatch);
+      B.saveToCache(entry, merged);
+      return { data: merged, networkFetched: true };
+    }
+
+    if (transient) throw new TransientLookupError("inconclusive lookup");
+    return { data: null, networkFetched: true };
   }
 
   async function searchByDoi(rawDoi) {
@@ -451,119 +564,104 @@
   }
 
   async function runVerification() {
+    resetCircuitBreakers();
     const total = parsedEntries.length;
     const seenTitles = new Map();
-    // Entry indices whose lookup was inconclusive (a source failed transiently);
-    // re-checked in a second pass once rate-limit pressure eases.
     const pendingRetry = [];
 
+    // Pre-pass: detect duplicates
     for (let i = 0; i < total; i++) {
       const entry = parsedEntries[i];
       const title = entry.title || "";
       const entryId = entry.ID || `entry_${i}`;
-
       const normKey = B.normalizeTitle(title);
       if (normKey && seenTitles.has(normKey)) {
         entry._duplicateOf = seenTitles.get(normKey);
       } else if (normKey) {
         seenTitles.set(normKey, entryId);
       }
-
-      const pct = Math.round(((i + 1) / total) * 100);
-      barProgressFill.style.width = pct + "%";
-      barProgressText.textContent = `Verifying ${i + 1} / ${total}: ${title.slice(0, 50)}…`;
-
-      if (!title.trim()) {
-        const r = buildResult(entry, i, "not_found", 0, [], {}, null);
-        results.push(r);
-        renderEntryCard(r);
-        updateSummary();
-        updatePreview();
-        continue;
-      }
-
-      const rawDoi = (entry.doi || "").trim();
-      const cleanTitle = B.stripLatex(title);
-      let found = null, inconclusive = false;
-      // Tour shortcut: the fabricated sample entry has a unique marker. Skip the
-      // real network lookup so the onboarding flow doesn't stall on a guaranteed
-      // miss; pause briefly so the "not found" status still feels deliberate.
-      const isTourFakeEntry = /QZX999/i.test(cleanTitle);
-      if (isTourFakeEntry) {
-        await sleep(500);
-      } else {
-        if (rawDoi) {
-          try {
-            found = await searchByDoi(rawDoi);
-          } catch (err) {
-            if (err instanceof TransientLookupError) inconclusive = true;
-            else console.warn("DOI lookup failed:", err);
-          }
-        }
-        if (!found && !inconclusive) {
-          try {
-            found = await performLookupWithRetries(cleanTitle);
-          } catch (err) {
-            if (err instanceof TransientLookupError) inconclusive = true;
-            else console.warn("Lookup failed:", err);
-          }
-        }
-      }
-
-      const r = buildFoundResult(entry, i, found);
-      if (inconclusive) { r._inconclusive = true; pendingRetry.push(i); }
-      results.push(r);
-      renderEntryCard(r);
-
-      updateSummary();
-      updateAuthorPills();
-      updatePreview();
     }
 
-    // Second pass: some entries came back inconclusive because a source was
-    // rate-limited or briefly unreachable during the busy first pass. Re-check
-    // them now that the adaptive limiter has recovered, so real papers aren't
-    // left flagged as "not found" (the flakiness users saw across reruns).
-    if (pendingRetry.length) {
-      barProgressText.textContent =
-        `Re-checking ${pendingRetry.length} ${pendingRetry.length === 1 ? "entry" : "entries"}…`;
-      await sleep(1200);
-      for (let round = 0; round < 2 && pendingRetry.length; round++) {
-        const stillPending = [];
-        for (const i of pendingRetry) {
-          const entry = parsedEntries[i];
-          const rawDoi = (entry.doi || "").trim();
-          const retryTitle = B.stripLatex(entry.title || "");
-          let found = null, inconclusive = false;
-          if (rawDoi) {
-            try {
-              found = await searchByDoi(rawDoi);
-            } catch (err) {
-              if (err instanceof TransientLookupError) inconclusive = true;
-              else console.warn("DOI retry lookup failed:", err);
-            }
-          }
-          if (!found && !inconclusive) {
-            try {
-              found = await performLookupWithRetries(retryTitle);
-            } catch (err) {
-              if (err instanceof TransientLookupError) inconclusive = true;
-              else console.warn("Retry lookup failed:", err);
-            }
-          }
-          // Keep deferring only while still inconclusive and a round remains.
-          if (inconclusive && round === 0) { stillPending.push(i); continue; }
-          const r = buildFoundResult(entry, i, found);
-          const at = results.findIndex(x => x.index === i);
-          if (at >= 0) results[at] = r; else results.push(r);
-          renderEntryCard(r);
-          updateSummary();
-          updateAuthorPills();
-          updatePreview();
+    const CHUNK_SIZE = 5;
+
+    for (let i = 0; i < total; i += CHUNK_SIZE) {
+      const chunk = parsedEntries.slice(i, i + CHUNK_SIZE);
+      let chunkNetworkFetched = false;
+
+      const chunkResults = await Promise.all(chunk.map(async (entry, chunkOffset) => {
+        const entryIdx = i + chunkOffset;
+        const title = entry.title || "";
+        const cleanTitle = B.stripLatex(title);
+
+        if (!title.trim() && !entry.doi) {
+          return { entry, index: entryIdx, found: null, inconclusive: false, isTourFake: false, networkFetched: false };
         }
-        pendingRetry.length = 0;
-        pendingRetry.push(...stillPending);
-        if (pendingRetry.length) await sleep(1500);
+
+        const isTourFakeEntry = /QZX999/i.test(cleanTitle);
+        if (isTourFakeEntry) {
+          await sleep(200);
+          return { entry, index: entryIdx, found: null, inconclusive: false, isTourFake: true, networkFetched: false };
+        }
+
+        let found = null, inconclusive = false, networkFetched = false;
+        try {
+          const res = await resolveCitation(entry, false);
+          if (res) {
+            found = res.data !== undefined ? res.data : res;
+            networkFetched = !!res.networkFetched;
+          }
+        } catch (err) {
+          if (err instanceof TransientLookupError) inconclusive = true;
+          else console.warn(`Lookup failed for entry ${entryIdx}:`, err);
+        }
+
+        return { entry, index: entryIdx, found, inconclusive, isTourFake: false, networkFetched };
+      }));
+
+      for (const res of chunkResults) {
+        if (res.networkFetched) chunkNetworkFetched = true;
+        const { entry, index, found, inconclusive } = res;
+        const r = buildFoundResult(entry, index, found);
+        if (inconclusive) { r._inconclusive = true; pendingRetry.push(index); }
+        results[index] = r;
+        renderEntryCard(r);
+      }
+
+      const completed = Math.min(i + CHUNK_SIZE, total);
+      const pct = Math.round((completed / total) * 100);
+      barProgressFill.style.width = pct + "%";
+      barProgressText.textContent = `Verifying ${completed} of ${total} entries (${pct}%)…`;
+
+      updateSummary();
+      if (completed % 20 === 0 || completed === total || !chunkNetworkFetched) {
+        updateAuthorPills();
+        updatePreview();
+      }
+
+      if (chunkNetworkFetched && i + CHUNK_SIZE < total) {
+        await sleep(1200);
+      }
+    }
+
+    if (pendingRetry.length) {
+      barProgressText.textContent = `Re-checking ${pendingRetry.length} ${pendingRetry.length === 1 ? "entry" : "entries"}…`;
+      await sleep(1200);
+      for (const idx of pendingRetry) {
+        const entry = parsedEntries[idx];
+        let found = null, inconclusive = false;
+        try {
+          const res = await resolveCitation(entry, true);
+          found = res ? (res.data !== undefined ? res.data : res) : null;
+        } catch (err) {
+          if (err instanceof TransientLookupError) inconclusive = true;
+        }
+        const r = buildFoundResult(entry, idx, found);
+        if (inconclusive) r._inconclusive = true;
+        results[idx] = r;
+        renderEntryCard(r);
+        updateSummary();
+        updateAuthorPills();
+        updatePreview();
       }
     }
 
@@ -583,7 +681,7 @@
     }, 800);
   }
 
-  function buildResult(entry, index, status, titleScore, fieldDiffs, suggested, found) {
+  function buildResult(entry, index, status, titleScore, fieldDiffs, suggested, found, isCached = false) {
     return {
       index,
       entry_id: entry.ID || "",
@@ -595,17 +693,16 @@
       suggested,
       found_title: found ? (found.title || "") : "",
       duplicate_of: entry._duplicateOf || null,
+      isCached: isCached || (found && found.isCached) || false,
     };
   }
 
-  // Turn a lookup outcome into a result object: a genuine miss becomes
-  // "not_found", otherwise the entry is compared against the found record.
   function buildFoundResult(entry, index, found) {
-    if (!found) return buildResult(entry, index, "not_found", 0, [], {}, null);
+    if (!found) return buildResult(entry, index, "not_found", 0, [], {}, null, false);
     const cmp = B.compareEntry(entry, found);
     let fieldDiffs = cmp.field_diffs;
     if (cmp.status === "needs_review") fieldDiffs = B.fieldDiffsForNeedsReview(entry, found);
-    return buildResult(entry, index, cmp.status, cmp.title_score, fieldDiffs, cmp.suggested, found);
+    return buildResult(entry, index, cmp.status, cmp.title_score, fieldDiffs, cmp.suggested, found, !!found.isCached);
   }
 
   // ─── Rendering ────────────────────────────────────────────────────
@@ -616,6 +713,8 @@
   function cardMatchesFilter(card) {
     if (activeFilter === "all") return true;
     if (activeFilter === "duplicate") return card.dataset.duplicate === "true";
+    if (activeFilter === "cached") return card.dataset.cached === "true";
+    if (activeFilter === "fetched") return card.dataset.cached === "false";
     return card.dataset.status === activeFilter;
   }
 
@@ -660,6 +759,7 @@
     card.className = `entry-card status-${r.status}`;
     card.dataset.status = r.status;
     card.dataset.index = r.index;
+    card.dataset.cached = r.isCached ? "true" : "false";
     if (r.duplicate_of) card.dataset.duplicate = "true";
 
     const idx = r.index;
@@ -840,6 +940,12 @@
       </a>
     </div>` : "";
 
+    const cachedBadge = r.isCached ? `<span class="status-tag tag-cached" title="Loaded from local cache">⚡ Cached</span>` : "";
+    const refetchBtn = r.isCached ? `<button type="button" class="btn-refetch" data-index="${idx}" title="Fetch fresh details from online APIs">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+          Refetch
+        </button>` : "";
+
     card.innerHTML = `<div class="entry-header">
       <div class="entry-header-text">
         <div class="entry-title">${esc(r.title || "(no title)")}</div>
@@ -847,8 +953,10 @@
       </div>
       <div class="entry-header-aside">
         ${jumpBtn}
+        ${refetchBtn}
         <div class="entry-tags">
           ${r.duplicate_of ? '<span class="status-tag tag-duplicate">Duplicate</span>' : ""}
+          ${cachedBadge}
           <span class="status-tag tag-${r.status}">${statusLabel(r.status)}</span>
         </div>
       </div>
@@ -865,6 +973,37 @@
     else entryList.appendChild(card);
     updateEntryEmptyState();
   }
+
+  // ─── Refetch button handler ──────────────────────────────────────
+  document.addEventListener("click", async (e) => {
+    const btn = e.target.closest(".btn-refetch");
+    if (!btn) return;
+    const idx = parseInt(btn.dataset.index, 10);
+    if (isNaN(idx) || !parsedEntries[idx]) return;
+
+    btn.disabled = true;
+    btn.textContent = "Refetching…";
+
+    const entry = parsedEntries[idx];
+    let found = null, inconclusive = false;
+    try {
+      const res = await resolveCitation(entry, true);
+      found = res ? (res.data !== undefined ? res.data : res) : null;
+    } catch (err) {
+      if (err instanceof TransientLookupError) inconclusive = true;
+      else console.warn(`Refetch failed for entry ${idx}:`, err);
+    }
+
+    const r = buildFoundResult(entry, idx, found);
+    if (inconclusive) r._inconclusive = true;
+    r.isCached = false;
+    results[idx] = r;
+
+    renderEntryCard(r);
+    updateSummary();
+    updateAuthorPills();
+    updatePreview();
+  });
 
   // ─── Fields table toggle ─────────────────────────────────────────
   document.addEventListener("click", (e) => {
@@ -1286,16 +1425,25 @@
   function updateSummary() {
     const c = { verified: 0, updated: 0, needs_review: 0, not_found: 0 };
     let dupes = 0;
+    let cachedCount = 0;
+    let fetchedCount = 0;
     results.forEach(r => {
+      if (!r) return;
       c[r.status] = (c[r.status] || 0) + 1;
       if (r.duplicate_of) dupes++;
+      if (r.isCached) cachedCount++;
+      else fetchedCount++;
     });
-    $(".badge-verified .summary-count").textContent = c.verified;
-    $(".badge-updated .summary-count").textContent = c.updated;
-    $(".badge-review .summary-count").textContent = c.needs_review;
-    $(".badge-notfound .summary-count").textContent = c.not_found;
-    $(".badge-duplicates .summary-count").textContent = dupes;
+    const bVer = $(".badge-verified .summary-count"); if (bVer) bVer.textContent = c.verified;
+    const bUpd = $(".badge-updated .summary-count"); if (bUpd) bUpd.textContent = c.updated;
+    const bRev = $(".badge-review .summary-count"); if (bRev) bRev.textContent = c.needs_review;
+    const bNot = $(".badge-notfound .summary-count"); if (bNot) bNot.textContent = c.not_found;
+    const bDup = $(".badge-duplicates .summary-count"); if (bDup) bDup.textContent = dupes;
+    const bCac = $(".badge-cached .summary-count"); if (bCac) bCac.textContent = cachedCount;
+    const bFet = $(".badge-fetched .summary-count"); if (bFet) bFet.textContent = fetchedCount;
     $$(".summary-badge").forEach(b => b.classList.add("active"));
+
+    updateStorageStats();
   }
 
   // ─── Author truncation ────────────────────────────────────────────
@@ -1452,7 +1600,7 @@
       // Update card visuals
       card.dataset.status = effectiveStatus;
       card.className = card.className.replace(/status-\S+/, `status-${effectiveStatus}`);
-      const tag = card.querySelector(".status-tag:not(.tag-duplicate)");
+      const tag = card.querySelector(".status-tag:not(.tag-duplicate):not(.tag-cached)");
       if (tag) {
         tag.className = `status-tag tag-${effectiveStatus}`;
         tag.textContent = statusLabel(effectiveStatus);
@@ -1472,16 +1620,49 @@
   function updateDynamicSummary() {
     const c = { verified: 0, updated: 0, needs_review: 0, not_found: 0 };
     let dupes = 0;
+    let cachedCount = 0;
+    let fetchedCount = 0;
     $$(".entry-card").forEach(card => {
       const status = card.dataset.status;
       c[status] = (c[status] || 0) + 1;
       if (card.dataset.duplicate === "true") dupes++;
+      if (card.dataset.cached === "true") cachedCount++;
+      else fetchedCount++;
     });
-    $(".badge-verified .summary-count").textContent = c.verified;
-    $(".badge-updated .summary-count").textContent = c.updated;
-    $(".badge-review .summary-count").textContent = c.needs_review;
-    $(".badge-notfound .summary-count").textContent = c.not_found;
-    $(".badge-duplicates .summary-count").textContent = dupes;
+    const bVer = $(".badge-verified .summary-count"); if (bVer) bVer.textContent = c.verified;
+    const bUpd = $(".badge-updated .summary-count"); if (bUpd) bUpd.textContent = c.updated;
+    const bRev = $(".badge-review .summary-count"); if (bRev) bRev.textContent = c.needs_review;
+    const bNot = $(".badge-notfound .summary-count"); if (bNot) bNot.textContent = c.not_found;
+    const bDup = $(".badge-duplicates .summary-count"); if (bDup) bDup.textContent = dupes;
+    const bCac = $(".badge-cached .summary-count"); if (bCac) bCac.textContent = cachedCount;
+    const bFet = $(".badge-fetched .summary-count"); if (bFet) bFet.textContent = fetchedCount;
+
+    updateStorageStats();
+  }
+
+  function updateStorageStats() {
+    let bytes = 0;
+    let items = 0;
+    if (typeof localStorage !== "undefined") {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith("fixBib_")) {
+          items++;
+          const val = localStorage.getItem(k) || "";
+          bytes += (k.length + val.length) * 2;
+        }
+      }
+    }
+    const kb = (bytes / 1024).toFixed(1);
+    let heapStr = "";
+    if (typeof performance !== "undefined" && performance.memory && performance.memory.usedJSHeapSize) {
+      const heapMB = (performance.memory.usedJSHeapSize / (1024 * 1024)).toFixed(1);
+      heapStr = ` | RAM: ${heapMB} MB`;
+    }
+    const label = $("#storage-stats-label");
+    if (label) {
+      label.textContent = `Storage: ${kb} KB (${items} entries)${heapStr}`;
+    }
   }
 
   // ─── Live preview ────────────────────────────────────────────────
@@ -2096,6 +2277,101 @@
 
   heroOverviewMq.addEventListener("change", syncHeroOverview);
   syncHeroOverview();
+
+  // ─── Subtle Cache Management Modal Controls ───────────────────────
+  const cacheModalBackdrop = $("#cache-modal-backdrop");
+  const cacheModalClose = $("#cache-modal-close");
+  const storageStatsChip = $("#storage-stats-chip");
+  const btnExportCache = $("#btn-export-cache");
+  const btnImportCache = $("#btn-import-cache");
+  const btnClearCache = $("#btn-clear-cache");
+  const cacheFileInput = $("#cache-file-input");
+
+  function openCacheModal() {
+    if (!cacheModalBackdrop) return;
+    updateStorageStats();
+    let bytes = 0, items = 0;
+    if (typeof localStorage !== "undefined") {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith("fixBib_")) {
+          items++;
+          bytes += (k.length + (localStorage.getItem(k) || "").length) * 2;
+        }
+      }
+    }
+    const kb = (bytes / 1024).toFixed(1);
+    const mSize = $("#modal-cache-size");
+    const mCount = $("#modal-cache-count");
+    if (mSize) mSize.textContent = `${kb} KB`;
+    if (mCount) mCount.textContent = `${items} ${items === 1 ? "entry" : "entries"} saved locally`;
+    cacheModalBackdrop.classList.add("active");
+  }
+
+  function closeCacheModal() {
+    cacheModalBackdrop?.classList.remove("active");
+  }
+
+  storageStatsChip?.addEventListener("click", openCacheModal);
+  cacheModalClose?.addEventListener("click", closeCacheModal);
+  cacheModalBackdrop?.addEventListener("click", (e) => {
+    if (e.target === cacheModalBackdrop) closeCacheModal();
+  });
+
+  btnExportCache?.addEventListener("click", () => {
+    const data = B.exportCacheData();
+    if (!data.count) {
+      alert("Local cache is empty. Verification results will be saved here automatically as you verify papers.");
+      return;
+    }
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const today = new Date().toISOString().split("T")[0];
+    a.href = url;
+    a.download = `fixBib_cache_${today}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
+  btnImportCache?.addEventListener("click", () => {
+    cacheFileInput?.click();
+  });
+
+  cacheFileInput?.addEventListener("change", (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert("File size exceeds 5MB limit. Please upload a valid fixBib cache JSON file.");
+      cacheFileInput.value = "";
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const parsed = JSON.parse(event.target.result);
+        const res = B.importCacheData(parsed, true);
+        alert(`Successfully imported ${res.importedCount} cached records in Merge mode!`);
+        updateStorageStats();
+        openCacheModal();
+      } catch (err) {
+        alert(`Import failed: ${err.message}`);
+      } finally {
+        cacheFileInput.value = "";
+      }
+    };
+    reader.readAsText(file);
+  });
+
+  btnClearCache?.addEventListener("click", () => {
+    if (!confirm("Are you sure you want to clear all locally cached reference metadata?")) return;
+    const count = B.clearCacheData();
+    alert(`Cleared ${count} cached entries from local storage.`);
+    updateStorageStats();
+    openCacheModal();
+  });
 
   function esc(str) {
     const d = document.createElement("div");

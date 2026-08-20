@@ -871,7 +871,7 @@ test("converts AIAA conference papers to @misc and sets howpublished", () => {
 
   const res = lib.compareEntry(original, found);
   assert.strictEqual(res.status, "updated");
-  assert.strictEqual(res.suggested.publisher, "AIAA Paper 88-2526");
+  assert.strictEqual(res.suggested.howpublished, "AIAA Paper 88-2526");
 });
 
 // ─── titleCaseIfAllCaps & Field Ordering ──
@@ -955,6 +955,109 @@ test("generates citation key according to requirements", () => {
     title: "The and of a", // all stop words
   };
   assert.strictEqual(lib.generateCitationKey(entry4), "author2020the");
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+console.log("\n── Local Caching System ──");
+
+test("generates correct cache keys for DOI and title", () => {
+  const entryDoi = { doi: "10.1017/jfm.2020.123", title: "Test Paper" };
+  assert.strictEqual(lib.getCacheKey(entryDoi), "fixBib_doi_10.1017/jfm.2020.123");
+
+  const entryTitle = { title: "Simulation and Modeling of Cold-Wall Hypersonic Boundary Layers" };
+  assert.strictEqual(lib.getCacheKey(entryTitle), "fixBib_title_simulationandmodelingofcoldwallhypersonicboundarylayers");
+});
+
+test("saves and retrieves minimal payload from cache", () => {
+  global.localStorage = {
+    _data: {},
+    getItem(k) { return this._data[k] || null; },
+    setItem(k, v) { this._data[k] = v; },
+    removeItem(k) { delete this._data[k]; },
+    clear() { this._data = {}; },
+    get length() { return Object.keys(this._data).length; },
+    key(i) { return Object.keys(this._data)[i] || null; }
+  };
+
+  const orig = { title: "Test Article Title", doi: "10.1000/182" };
+  const res = { title: "Test Article Title", author: "Huang, J.", year: "2020", doi: "10.1000/182", _source: "crossref" };
+
+  lib.saveToCache(orig, res);
+  const cached = lib.getFromCache(orig);
+
+  assert.ok(cached);
+  assert.strictEqual(cached.isCached, true);
+  assert.strictEqual(cached.author, "Huang, J.");
+  assert.strictEqual(cached.year, "2020");
+
+  delete global.localStorage;
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+console.log("\n── Portable Cache Export & Import ──");
+
+test("exportCacheData exports structured object", () => {
+  global.localStorage = {
+    _data: { "fixBib_doi_10.1000/182": JSON.stringify({ title: "Paper 1", doi: "10.1000/182" }) },
+    getItem(k) { return this._data[k] || null; },
+    setItem(k, v) { this._data[k] = v; },
+    removeItem(k) { delete this._data[k]; },
+    clear() { this._data = {}; },
+    get length() { return Object.keys(this._data).length; },
+    key(i) { return Object.keys(this._data)[i] || null; }
+  };
+
+  const exported = lib.exportCacheData();
+  assert.strictEqual(exported.app, "fixBib");
+  assert.strictEqual(exported.count, 1);
+  assert.ok(exported.cache["fixBib_doi_10.1000/182"]);
+
+  delete global.localStorage;
+});
+
+test("validateAndSanitizeCacheData rejects invalid and sanitizes script tags", () => {
+  const invalid = lib.validateAndSanitizeCacheData(null);
+  assert.strictEqual(invalid.valid, false);
+
+  const malicious = {
+    cache: {
+      "fixBib_doi_10.1000/bad": {
+        title: "Malicious <script>alert(1)</script> Title",
+        doi: "10.1000/bad"
+      }
+    }
+  };
+  const val = lib.validateAndSanitizeCacheData(malicious);
+  assert.strictEqual(val.valid, true);
+  assert.strictEqual(val.sanitizedCache["fixBib_doi_10.1000/bad"].title, "Malicious  Title");
+});
+
+test("importCacheData and clearCacheData update localStorage", () => {
+  global.localStorage = {
+    _data: {},
+    getItem(k) { return this._data[k] || null; },
+    setItem(k, v) { this._data[k] = v; },
+    removeItem(k) { delete this._data[k]; },
+    clear() { this._data = {}; },
+    get length() { return Object.keys(this._data).length; },
+    key(i) { return Object.keys(this._data)[i] || null; }
+  };
+
+  const payload = {
+    cache: {
+      "fixBib_doi_10.1000/test": { title: "Test Title", doi: "10.1000/test" }
+    }
+  };
+
+  const imp = lib.importCacheData(payload, true);
+  assert.strictEqual(imp.importedCount, 1);
+  assert.ok(global.localStorage.getItem("fixBib_doi_10.1000/test"));
+
+  const cleared = lib.clearCacheData();
+  assert.strictEqual(cleared, 1);
+  assert.strictEqual(global.localStorage.length, 0);
+
+  delete global.localStorage;
 });
 
 // ═══════════════════════════════════════════════════════════════════════
