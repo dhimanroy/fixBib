@@ -10,3 +10,7 @@ venv/
 !test_refs.bib
 .cursor/
 node_modules/
+
+# Ignore macOS system files in all directories
+**/.DS_Store
+**/._.DS_Store
