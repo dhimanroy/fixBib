@@ -39,7 +39,7 @@ Runs **100% in your browser** — no install, no server, no account required. Qu
 | Missing DOIs & incomplete fields | Performs DOI-first verification and exhaustively queries online databases to complete missing DOIs, dates, volumes, and page numbers |
 | Downgraded author names | Preserves full author names (e.g., *Huang, Junji*) and prevents APIs from replacing them with initials |
 | AIAA paper formatting varies | Formats AIAA conference papers as `@misc` with `howpublished` for AIAA Journal, or `@inproceedings` with `note` for JFM/PoF |
-| Inconsistent citation keys & unaligned files | Generates standardized citation keys (e.g. `huang2020simulation`) and exports aligned, clean BibTeX |
+| Inconsistent citation keys & unaligned files | Generates standardized citation keys (e.g. `roy2026direct`) and exports aligned, clean BibTeX |
 
 ---
 
@@ -49,11 +49,11 @@ Runs **100% in your browser** — no install, no server, no account required. Qu
 - **AIAA Journal**:
   - Publication Title: **Title Case** (e.g., *Simulation and Modeling of Cold-Wall Hypersonic...*)
   - Journal Name: **Full Name** (e.g., *Journal of Fluid Mechanics*)
-  - AIAA Conference Papers: Formatted as `@misc` with `howpublished = {AIAA Paper 2020-0571}`.
+  - AIAA Conference Papers: Formatted as `@misc` with `howpublished = {AIAA Paper 2026-2139}`.
 - **JFM or PoF**:
   - Publication Title: **Sentence Case** (e.g., *Simulation and modeling of cold-wall hypersonic...*)
   - Journal Name: **Abbreviated ISO standard** (e.g., *J. Fluid Mech.*, *Phys. Fluids*, *J. Comput. Phys.*, *Phil. Trans. R. Soc. A*)
-  - AIAA Conference Papers: Kept as `@inproceedings` with `note = {AIAA Paper 2020-0571}` and `booktitle`.
+  - AIAA Conference Papers: Kept as `@inproceedings` with `note = {AIAA Paper 2026-2139}` and `booktitle`.
 
 ---
 
@@ -63,7 +63,7 @@ Runs **100% in your browser** — no install, no server, no account required. Qu
 - **DOI-First & Multi-Source Verification**: Queries CrossRef, Semantic Scholar, and OpenAlex directly by DOI or title to ensure high-accuracy reference verification.
 - **Author Full Name Protection**: Automatically prevents APIs from downgrading full author names to initials.
 - **Comprehensive Science & Engineering Abbreviations**: Built-in dictionary supporting standard ISO 4 journal abbreviations across aerospace, fluid dynamics, thermal sciences, physics, chemistry, and computer science.
-- **Citation Key Generator**: Standardized keys formatted as `[author][year][title word]` (e.g. `huang2020simulation`).
+- **Citation Key Generator**: Standardized keys formatted as `[author][year][title word]` (e.g. `roy2026direct`).
 - **Privacy-first**: Processing happens entirely in-browser.
 
 ---
