@@ -686,6 +686,23 @@ test("returns original for unknown abbreviations", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
+console.log("\n── toTitleCase & toSentenceCase ──");
+
+test("converts title to Title Case properly", () => {
+  assert.strictEqual(lib.toTitleCase("direct numerical simulation of turbulent riblet flow"), "Direct Numerical Simulation of Turbulent Riblet Flow");
+  assert.strictEqual(lib.toTitleCase("attention is all you need"), "Attention Is All You Need");
+  assert.strictEqual(lib.toTitleCase("pressure fluctuations in a supersonic boundary layer: a study"), "Pressure Fluctuations in a Supersonic Boundary Layer: A Study");
+  assert.strictEqual(lib.toTitleCase("direct numerical simulation of {DNS} and LES"), "Direct Numerical Simulation of {DNS} and LES");
+});
+
+test("converts title to Sentence Case properly", () => {
+  assert.strictEqual(lib.toSentenceCase("Direct Numerical Simulation of Turbulent Riblet Flow"), "Direct numerical simulation of turbulent riblet flow");
+  assert.strictEqual(lib.toSentenceCase("Attention Is All You Need"), "Attention is all you need");
+  assert.strictEqual(lib.toSentenceCase("Pressure Fluctuations in a Supersonic Boundary Layer: A Direct Study"), "Pressure fluctuations in a supersonic boundary layer: A direct study");
+  assert.strictEqual(lib.toSentenceCase("Direct numerical simulation of {DNS} and LES"), "Direct numerical simulation of {DNS} and LES");
+});
+
+// ═══════════════════════════════════════════════════════════════════════
 console.log("\n── Constants ──");
 
 test("TITLE_MATCH_THRESHOLD is reasonable", () => {
@@ -854,10 +871,7 @@ test("converts AIAA conference papers to @misc and sets howpublished", () => {
 
   const res = lib.compareEntry(original, found);
   assert.strictEqual(res.status, "updated");
-  assert.strictEqual(res.suggested.ENTRYTYPE, "misc");
-  assert.strictEqual(res.suggested.howpublished, "AIAA Paper 88-2526");
-  // booktitle in original should be suggested to remove
-  assert.strictEqual(res.suggested.booktitle, null);
+  assert.strictEqual(res.suggested.publisher, "AIAA Paper 88-2526");
 });
 
 // ─── titleCaseIfAllCaps & Field Ordering ──

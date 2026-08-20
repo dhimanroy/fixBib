@@ -7,9 +7,10 @@
   const CROSSREF_API = "https://api.crossref.org/works";
   const SS_MATCH = "https://api.semanticscholar.org/graph/v1/paper/search/match";
   const SS_SEARCH = "https://api.semanticscholar.org/graph/v1/paper/search";
+  const SS_PAPER = "https://api.semanticscholar.org/graph/v1/paper";
   const SS_FIELDS = "title,authors,year,venue,publicationVenue,externalIds";
   const OPENALEX_API = "https://api.openalex.org/works";
-  const OPENALEX_FIELDS = "title,display_name,publication_year,doi,authorships,primary_location,biblio,id";
+  const OPENALEX_FIELDS = "title,display_name,publication_year,doi,ids,authorships,primary_location,biblio,id";
   const MAX_RETRIES = 4;
   const RETRY_BASE_MS = 1500;
 
@@ -112,25 +113,22 @@
   async function searchCrossref(title) {
     const data = await fetchJSON(CROSSREF_API, {
       "query.title": title, rows: "5",
-      select: "title,author,published-print,published-online,container-title,volume,issue,page,DOI,publisher,URL,type",
     });
     return (data?.message?.items || []).map(B.crossrefToStandard);
   }
 
   async function searchOpenAlex(title) {
-    // Title-only query keeps the "only titles leave your machine" guarantee —
-    // no `mailto`, so nothing personally identifying is sent.
     const data = await fetchJSON(OPENALEX_API, {
       search: title, per_page: "5", select: OPENALEX_FIELDS,
     });
     return (data?.results || []).map(B.openAlexToStandard);
   }
 
-  async function lookupPaper(queryTitle, originalTitle = queryTitle) {
-    // Each source is attempted independently: a transient failure in one is
-    // recorded but doesn't stop us from trying the others. Only if nothing
-    // matches AND at least one source failed transiently do we report the
-    // lookup as inconclusive (so the caller retries instead of giving up).
+  async function searchByDoi(rawDoi) {
+    if (!rawDoi) return null;
+    const cleanDoi = rawDoi.trim().replace(/^https?:\/\/(dx\.)?doi\.org\//i, "");
+    if (!cleanDoi) return null;
+
     let transient = false;
     const attemptStep = async (fn) => {
       try { return await fn(); }
@@ -140,68 +138,117 @@
       }
     };
 
-    const ssMatch = await attemptStep(() => searchSSMatch(queryTitle));
-    if (ssMatch && B.titleSimilarity(originalTitle, ssMatch.title || "") >= B.MIN_TITLE_SIM) {
-      const crCandidates = (await attemptStep(() => searchCrossref(queryTitle))) || [];
-      const crMatch = B.bestMatch(crCandidates, originalTitle);
-      if (crMatch && B.isSamePaper(ssMatch, crMatch))
-        return B.mergeMetadata(ssMatch, crMatch);
-      const oaCandidates = (await attemptStep(() => searchOpenAlex(queryTitle))) || [];
-      const oaMatch = B.bestMatch(oaCandidates, originalTitle);
-      if (oaMatch && B.isSamePaper(ssMatch, oaMatch))
-        return B.mergeMetadata(ssMatch, oaMatch);
-      return ssMatch;
+    const crResult = await attemptStep(async () => {
+      const data = await fetchJSON(`${CROSSREF_API}/${encodeURIComponent(cleanDoi)}`, {}, { is404Ok: true });
+      return data?.message ? B.crossrefToStandard(data.message) : null;
+    });
+
+    const ssResult = await attemptStep(async () => {
+      const data = await fetchJSON(`${SS_PAPER}/DOI:${encodeURIComponent(cleanDoi)}`, { fields: SS_FIELDS }, { is404Ok: true });
+      return data ? B.ssToStandard(data) : null;
+    });
+
+    const oaResult = await attemptStep(async () => {
+      const data = await fetchJSON(`${OPENALEX_API}/https://doi.org/${encodeURIComponent(cleanDoi)}`, { select: OPENALEX_FIELDS }, { is404Ok: true });
+      return data ? B.openAlexToStandard(data) : null;
+    });
+
+    let bestRecord = crResult || ssResult || oaResult;
+    if (!bestRecord) {
+      if (transient) throw new TransientLookupError("inconclusive DOI lookup");
+      return null;
     }
+
+    let merged = { ...bestRecord };
+    for (const r of [crResult, ssResult, oaResult]) {
+      if (r && r !== bestRecord) {
+        merged = B.mergeMetadata(merged, r);
+      }
+    }
+    if (!merged.doi) merged.doi = cleanDoi;
+    return merged;
+  }
+
+  async function lookupPaper(queryTitle, originalTitle = queryTitle) {
+    let transient = false;
+    const attemptStep = async (fn) => {
+      try { return await fn(); }
+      catch (err) {
+        if (err instanceof TransientLookupError) { transient = true; return null; }
+        throw err;
+      }
+    };
 
     const crCandidates = (await attemptStep(() => searchCrossref(queryTitle))) || [];
     const crMatch = B.bestMatch(crCandidates, originalTitle);
-    if (crMatch) return crMatch;
+
+    const ssMatch = await attemptStep(() => searchSSMatch(queryTitle));
+    const ssValid = ssMatch && B.titleSimilarity(originalTitle, ssMatch.title || "") >= B.MIN_TITLE_SIM ? ssMatch : null;
 
     const oaCandidates = (await attemptStep(() => searchOpenAlex(queryTitle))) || [];
     const oaMatch = B.bestMatch(oaCandidates, originalTitle);
-    if (oaMatch) return oaMatch;
 
     const ssCandidates = (await attemptStep(() => searchSSSearch(queryTitle))) || [];
     const ssSearchMatch = B.bestMatch(ssCandidates, originalTitle);
-    if (ssSearchMatch) {
-      const crCandidates2 = (await attemptStep(() => searchCrossref(queryTitle))) || [];
-      const crMatch2 = B.bestMatch(crCandidates2, originalTitle);
-      if (crMatch2 && B.isSamePaper(ssSearchMatch, crMatch2))
-        return B.mergeMetadata(ssSearchMatch, crMatch2);
-      const oaCandidates2 = (await attemptStep(() => searchOpenAlex(queryTitle))) || [];
-      const oaMatch2 = B.bestMatch(oaCandidates2, originalTitle);
-      if (oaMatch2 && B.isSamePaper(ssSearchMatch, oaMatch2))
-        return B.mergeMetadata(ssSearchMatch, oaMatch2);
-      return ssSearchMatch;
+
+    let bestRecord = crMatch || ssValid || oaMatch || ssSearchMatch;
+    if (!bestRecord) {
+      if (transient) throw new TransientLookupError("inconclusive lookup");
+      return null;
     }
 
-    if (transient) throw new TransientLookupError("inconclusive lookup");
-    return null;
+    let merged = { ...bestRecord };
+    const candidatesToMerge = [crMatch, ssValid, oaMatch, ssSearchMatch];
+    for (const c of candidatesToMerge) {
+      if (c && c !== bestRecord && B.isSamePaper(merged, c)) {
+        merged = B.mergeMetadata(merged, c);
+      }
+    }
+
+    // Try ALL candidates from ALL sources to find a DOI if still missing
+    if (!merged.doi) {
+      const allCandidates = [...crCandidates, ...oaCandidates, ...ssCandidates];
+      for (const c of allCandidates) {
+        if (c && c.doi && B.titleSimilarity(originalTitle, c.title || "") >= 75) {
+          merged.doi = c.doi;
+          if (!merged.url) merged.url = `https://doi.org/${c.doi}`;
+          break;
+        }
+      }
+    }
+
+    return merged;
   }
 
   async function performLookupWithRetries(cleanTitle) {
     let found = await lookupPaper(cleanTitle, cleanTitle);
-    if (found) return found;
+    if (found && found.doi) return found;
 
-    // Extra clean: strip punctuation/braces and math/LaTeX leftovers
+    // Extra clean: strip punctuation/braces and math/LaTeX leftovers to hunt for missing DOI
     let extraClean = cleanTitle.replace(/[\{\}\(\)\[\]\-\_\:\;\,\.\?\!\'\"]/g, " ")
                                .replace(/[\$\\+\\*\\^\\/_~=]/g, "")
                                .replace(/\s+/g, " ")
                                .trim();
     if (extraClean && extraClean !== cleanTitle) {
-      found = await lookupPaper(extraClean, cleanTitle);
-      if (found) return found;
+      const retryFound = await lookupPaper(extraClean, cleanTitle);
+      if (retryFound) {
+        found = found ? B.mergeMetadata(found, retryFound) : retryFound;
+        if (found.doi) return found;
+      }
     }
 
-    // Truncate to first 8 words
+    // Truncate to first 8 words to hunt for missing DOI
     const words = (extraClean || cleanTitle).split(/\s+/).filter(Boolean);
     if (words.length > 8) {
       const shortTitle = words.slice(0, 8).join(" ");
-      found = await lookupPaper(shortTitle, cleanTitle);
-      if (found) return found;
+      const retryShort = await lookupPaper(shortTitle, cleanTitle);
+      if (retryShort) {
+        found = found ? B.mergeMetadata(found, retryShort) : retryShort;
+        if (found.doi) return found;
+      }
     }
 
-    return null;
+    return found;
   }
 
   // ─── Theme ─────────────────────────────────────────────────────────
@@ -435,6 +482,7 @@
         continue;
       }
 
+      const rawDoi = (entry.doi || "").trim();
       const cleanTitle = B.stripLatex(title);
       let found = null, inconclusive = false;
       // Tour shortcut: the fabricated sample entry has a unique marker. Skip the
@@ -444,11 +492,21 @@
       if (isTourFakeEntry) {
         await sleep(500);
       } else {
-        try {
-          found = await performLookupWithRetries(cleanTitle);
-        } catch (err) {
-          if (err instanceof TransientLookupError) inconclusive = true;
-          else console.warn("Lookup failed:", err);
+        if (rawDoi) {
+          try {
+            found = await searchByDoi(rawDoi);
+          } catch (err) {
+            if (err instanceof TransientLookupError) inconclusive = true;
+            else console.warn("DOI lookup failed:", err);
+          }
+        }
+        if (!found && !inconclusive) {
+          try {
+            found = await performLookupWithRetries(cleanTitle);
+          } catch (err) {
+            if (err instanceof TransientLookupError) inconclusive = true;
+            else console.warn("Lookup failed:", err);
+          }
         }
       }
 
@@ -474,13 +532,24 @@
         const stillPending = [];
         for (const i of pendingRetry) {
           const entry = parsedEntries[i];
+          const rawDoi = (entry.doi || "").trim();
           const retryTitle = B.stripLatex(entry.title || "");
           let found = null, inconclusive = false;
-          try {
-            found = await performLookupWithRetries(retryTitle);
-          } catch (err) {
-            if (err instanceof TransientLookupError) inconclusive = true;
-            else console.warn("Retry lookup failed:", err);
+          if (rawDoi) {
+            try {
+              found = await searchByDoi(rawDoi);
+            } catch (err) {
+              if (err instanceof TransientLookupError) inconclusive = true;
+              else console.warn("DOI retry lookup failed:", err);
+            }
+          }
+          if (!found && !inconclusive) {
+            try {
+              found = await performLookupWithRetries(retryTitle);
+            } catch (err) {
+              if (err instanceof TransientLookupError) inconclusive = true;
+              else console.warn("Retry lookup failed:", err);
+            }
           }
           // Keep deferring only while still inconclusive and a round remains.
           if (inconclusive && round === 0) { stillPending.push(i); continue; }
@@ -1458,12 +1527,46 @@
       if (out.journal) out.journal = B.cleanVenue(out.journal);
       if (out.booktitle) out.booktitle = B.cleanVenue(out.booktitle);
 
-      if (s.abbreviateJournals) {
+      if (s.pubFormat === "jfm_pof" || s.pubFormat === "jfm" || s.pubFormat === "pof") {
         if (out.journal) out.journal = B.abbreviateVenue(out.journal);
         if (out.booktitle) out.booktitle = B.abbreviateVenue(out.booktitle);
-      } else {
+      } else if (s.pubFormat === "aiaa") {
         if (out.journal) out.journal = B.expandVenue(out.journal);
         if (out.booktitle) out.booktitle = B.expandVenue(out.booktitle);
+      }
+
+      if (s.pubFormat === "jfm_pof" || s.pubFormat === "jfm" || s.pubFormat === "pof") {
+        if (out.title) out.title = B.toSentenceCase(out.title);
+      } else if (s.pubFormat === "aiaa") {
+        if (out.title) out.title = B.toTitleCase(out.title);
+      }
+
+      const aiaaPaperNum = B.getAiaaPaperNumber(out) || B.getAiaaPaperNumber(r?.suggested);
+      if (aiaaPaperNum) {
+        if (s.pubFormat === "aiaa") {
+          out.ENTRYTYPE = "misc";
+          out.howpublished = "AIAA Paper " + aiaaPaperNum;
+          delete out.journal;
+          delete out.booktitle;
+          delete out.volume;
+          delete out.number;
+          delete out.pages;
+          delete out.publisher;
+          delete out.note;
+        } else {
+          if (!out.ENTRYTYPE || out.ENTRYTYPE === "misc") {
+            out.ENTRYTYPE = "inproceedings";
+          }
+          if (out.howpublished && /AIAA Paper/i.test(out.howpublished)) {
+            delete out.howpublished;
+          }
+          if (out.journal && !out.booktitle) {
+            out.booktitle = out.journal;
+          }
+          delete out.journal;
+          delete out.publisher;
+          out.note = "AIAA Paper " + aiaaPaperNum;
+        }
       }
 
       if (s.updateKeys) {
@@ -1623,7 +1726,6 @@
   const optCleanNotes = $("#opt-clean-notes");
   const optMaxAuthors = $("#opt-max-authors");
   const optPreferPublished = $("#opt-prefer-published");
-  const optAbbreviateJournals = $("#opt-abbreviate-journals");
   const optUpdateKeys = $("#opt-update-keys");
   const dedupCriteriaWrap = $("#dedup-criteria-wrap");
 
@@ -1645,7 +1747,9 @@
     updatePreview();
   });
 
-  [optRemoveNotFound, optCleanNotes, optPreferPublished, optAbbreviateJournals, optUpdateKeys].forEach(el =>
+  [optRemoveNotFound, optCleanNotes, optPreferPublished, optUpdateKeys].forEach(el =>
+    el.addEventListener("change", updatePreview));
+  $$('input[name="pub-format"]').forEach(el =>
     el.addEventListener("change", updatePreview));
   optMaxAuthors.addEventListener("change", () => {
     updateAuthorPills();
@@ -1662,7 +1766,7 @@
       cleanNotes: optCleanNotes.checked,
       maxAuthors: parseInt(optMaxAuthors.value) || 0,
       preferPublished: optPreferPublished.checked,
-      abbreviateJournals: optAbbreviateJournals.checked,
+      pubFormat: (document.querySelector('input[name="pub-format"]:checked') || {}).value || "default",
       updateKeys: optUpdateKeys.checked,
     };
   }

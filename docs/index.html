@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="google-site-verification" content="Ec53uaP67xWogWFEI0Asj4FyQZ3RjAtHp6CcQckrWOI" />
 
-  <title>fixBib — Verify &amp; Format BibTeX for Aerospace Publications</title>
-  <meta name="description" content="Free online tool to verify and format BibTeX entries, with support for Aerospace publications like AIAA and JFM. Supports journal abbreviation toggles, citation key updates, and standardized BibTeX formatting. Works in the browser — no install needed." />
-  <meta name="keywords" content="BibTeX, bibliography checker, verify references, AIAA, JFM, Aerospace, journal abbreviation, LaTeX, CrossRef, Semantic Scholar, OpenAlex, DOI, citation checker, academic references, .bib file, Overleaf, BibLaTeX, reference manager" />
+  <title>fixBib — Verify &amp; Format BibTeX for Academic &amp; Aerospace Publications</title>
+  <meta name="description" content="Free online tool to verify and format BibTeX entries according to prescribed publication formats like AIAA Journal and JFM or PoF. Automatically formats titles, abbreviates journal names, verifies DOIs, and cleans references in your browser." />
+  <meta name="keywords" content="BibTeX, bibliography checker, verify references, AIAA, JFM, POF, Aerospace, publication format, journal abbreviation, LaTeX, CrossRef, Semantic Scholar, OpenAlex, DOI, citation checker, academic references, .bib file, Overleaf, BibLaTeX, reference manager" />
   <meta name="author" content="merfanian" />
   <meta name="robots" content="index, follow" />
   <link rel="canonical" href="https://dhimanroy.github.io/fixBib/" />
@@ -16,14 +16,14 @@
 
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://dhimanroy.github.io/fixBib/" />
-  <meta property="og:title" content="fixBib — Verify &amp; Format BibTeX for Aerospace Publications" />
-  <meta property="og:description" content="Free browser-based tool to format and verify BibTeX entries for Aerospace publications like AIAA and JFM. Supports journal abbreviation toggles, citation key updates, and standardized BibTeX formatting." />
+  <meta property="og:title" content="fixBib — Verify &amp; Format BibTeX for Academic &amp; Aerospace Publications" />
+  <meta property="og:description" content="Free browser-based tool to format and verify BibTeX entries according to prescribed publication formats (AIAA Journal, JFM or PoF). Automatically formats titles, journal names, DOIs, and citation keys." />
   <meta property="og:site_name" content="fixBib" />
   <meta property="og:image" content="https://dhimanroy.github.io/fixBib/og-image.png" />
 
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="fixBib — Verify &amp; Format BibTeX for Aerospace Publications" />
-  <meta name="twitter:description" content="Format and verify BibTeX entries for Aerospace publications like AIAA and JFM. Supports journal abbreviation toggles, citation key updates, and standardized BibTeX formatting." />
+  <meta name="twitter:title" content="fixBib — Verify &amp; Format BibTeX for Academic &amp; Aerospace Publications" />
+  <meta name="twitter:description" content="Format and verify BibTeX entries according to prescribed publication formats (AIAA Journal, JFM or PoF). Automatically formats titles, journal names, DOIs, and citation keys." />
 
   <script type="application/ld+json">
   {
@@ -31,12 +31,12 @@
     "@type": "WebApplication",
     "name": "fixBib",
     "url": "https://dhimanroy.github.io/fixBib/",
-    "description": "Free online tool to verify and format BibTeX bibliography entries, with support for Aerospace publications like AIAA and JFM. Supports journal abbreviation toggles, citation key updates, and standardized BibTeX formatting.",
+    "description": "Free online tool to verify and format BibTeX bibliography entries according to prescribed publication formats like AIAA Journal and JFM or PoF. Formats titles, journal names, AIAA conference entries, and citation keys.",
     "applicationCategory": "UtilitiesApplication",
     "operatingSystem": "Any",
     "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
     "browserRequirements": "Requires a modern web browser with JavaScript enabled",
-    "featureList": ["BibTeX verification", "Aerospace formatting", "AIAA paper styling", "Journal abbreviation toggle", "Citation key generation", "Field alignment"],
+    "featureList": ["BibTeX verification", "Publication Formats (AIAA, JFM or PoF)", "DOI verification", "Journal abbreviations", "Citation key generation", "Field alignment"],
     "isAccessibleForFree": true,
     "license": "https://opensource.org/licenses/MIT"
   }
@@ -70,13 +70,14 @@
         <svg class="hero-overview-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
       </button>
       <div class="hero-overview" id="hero-overview">
-        <p class="hero-tagline">Clean, verify, and format your BibTeX references for aerospace and fluid dynamics publications.</p>
+        <p class="hero-tagline">Clean, verify, and format your BibTeX references for prescribed publication styles.</p>
         <p class="hero-lead">Upload a <code>.bib</code> file or paste directly from Overleaf.
-          fixBib checks every entry against
-          <a href="https://www.crossref.org/" target="_blank">CrossRef</a> and
-          <a href="https://www.semanticscholar.org/" target="_blank">Semantic Scholar</a>, with
-          <a href="https://openalex.org/" target="_blank">OpenAlex</a> as a fallback. It automatically standardizes references to match aerospace publications, enables toggling between abbreviated and full journal names (like <em>J. Fluid Mech.</em> vs <em>Journal of Fluid Mechanics</em>), cleans author formatting, and exports beautifully aligned entries.
-          Everything occur 100% in-browser — your bibliography never leaves your machine.</p>
+          fixBib verifies every entry by DOI or title against
+          <a href="https://www.crossref.org/" target="_blank">CrossRef</a>,
+          <a href="https://www.semanticscholar.org/" target="_blank">Semantic Scholar</a>, and
+          <a href="https://openalex.org/" target="_blank">OpenAlex</a>.
+          Select your target publication format (such as <strong>AIAA Journal</strong>, <strong>Journal of Fluid Mechanics</strong>, or <strong>Physics of Fluids</strong>), and fixBib automatically formats publication titles (Title Case vs. Sentence Case), journal names (full titles vs. standard ISO abbreviations), AIAA paper entries (as <code>@misc</code> or <code>@inproceedings</code> with <code>note</code>), preserves full author names, and exports clean, standardized BibTeX.
+          Everything runs 100% in-browser — your bibliography never leaves your machine.</p>
       </div>
     </header>
 
@@ -199,7 +200,7 @@
         <div class="step">
           <div class="step-num">4</div>
           <h3>Download</h3>
-          <p>Download or copy the corrected <code>.bib</code> file with your changes applied. Ready for LaTeX, Overleaf, or any reference manager.</p>
+          <p>Download or copy your corrected <code>.bib</code> file formatted in your preferred publication style (AIAA Journal, JFM or PoF, or As Input) with all custom settings applied. Ready for Overleaf or LaTeX.</p>
         </div>
       </div>
     </section>
@@ -209,10 +210,10 @@
       <div class="features-grid">
         <div class="feature-card">
           <div class="feature-icon-wrapper">
-            <svg class="feature-card-icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            <svg class="feature-card-icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
           </div>
-          <h3>Aerospace Formatting</h3>
-          <p>Formats AIAA papers to @misc with howpublished paper numbers, compatible with AIAA, JFM, etc.</p>
+          <h3>DOI &amp; Online Verification</h3>
+          <p>Verifies entries by DOI or title against CrossRef, Semantic Scholar, and OpenAlex to complete missing DOIs, dates, and volumes.</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon-wrapper">
@@ -230,10 +231,10 @@
         </div>
         <div class="feature-card">
           <div class="feature-icon-wrapper">
-            <svg class="feature-card-icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <svg class="feature-card-icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 3.5A2.5 2.5 0 0 1 6.5 6H20M4 6v13.5M20 6v13.5"/><path d="M6 6H18M6 10H18M6 14H18"/></svg>
           </div>
-          <h3>Journal Abbreviation</h3>
-          <p>Toggle between abbreviated forms and full names for major fluid mechanics and aerospace journals.</p>
+          <h3>Publication Formats</h3>
+          <p>Robust prescribed formatting for AIAA Journal, JFM, and PoF. Formats titles (Title vs Sentence Case) and journal names with comprehensive ISO 4 scientific abbreviations (e.g. <em>J. Fluid Mech.</em>, <em>Phys. Fluids</em>).</p>
         </div>
       </div>
     </section>
@@ -248,7 +249,7 @@
   <div class="floating-bar" id="floating-bar">
     <div class="floating-bar-inner">
       <div class="settings-anchor">
-        <button class="settings-btn" id="settings-toggle" title="Download settings">
+        <button class="settings-btn" id="settings-toggle" title="Publication format &amp; download settings">
           <svg viewBox="0 0 20 20" width="18" height="18" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>
         </button>
         <div class="settings-popover" id="settings-popover">
@@ -306,9 +307,13 @@
           <div class="settings-row">
             <svg class="setting-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 3.5A2.5 2.5 0 0 1 6.5 6H20M4 6v13.5M20 6v13.5"/><path d="M6 6H18M6 10H18M6 14H18"/></svg>
             <label class="option-toggle">
-              <input type="checkbox" id="opt-abbreviate-journals" />
-              <span>Abbreviate journal names</span>
+              <span>Publication Format:</span>
             </label>
+          </div>
+          <div class="sub-option visible" id="pub-format-wrap">
+            <label class="radio-label"><input type="radio" name="pub-format" value="default" checked /> As Input</label>
+            <label class="radio-label"><input type="radio" name="pub-format" value="aiaa" /> AIAA Journal</label>
+            <label class="radio-label"><input type="radio" name="pub-format" value="jfm_pof" /> JFM or PoF</label>
           </div>
           <div class="settings-row">
             <svg class="setting-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M11 12l9-9M17 3l4 4M14 6l3 3"/></svg>

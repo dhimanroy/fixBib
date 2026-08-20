@@ -401,6 +401,11 @@
     if (original.booktitle && !original.journal && foundJournal)
       found.booktitle = foundJournal;
 
+    // Preserve original full author names if original author is more complete than found author
+    if (original.author && found.author && isMoreComplete(found.author, original.author)) {
+      found.author = original.author;
+    }
+
     const foundIsPreprint = isPreprint(found);
     const fieldDiffs = [], enrichments = [];
     let hasDifference = false;
@@ -412,11 +417,9 @@
     const isAiaa = !!aiaaPaperNum;
 
     if (isAiaa) {
-      found.ENTRYTYPE = "misc";
-      found.howpublished = "AIAA Paper " + aiaaPaperNum;
-      const removeFields = ["journal", "booktitle", "volume", "number", "pages", "publisher"];
-      for (const f of removeFields) {
-        found[f] = "";
+      found._aiaaPaperNum = aiaaPaperNum;
+      if (!found.publisher && !original.publisher) {
+        found.publisher = "AIAA Paper " + aiaaPaperNum;
       }
     }
 
@@ -425,17 +428,11 @@
       const foundVal = found[field] || "";
       if (!origVal && !foundVal) continue;
 
-      const isAiaaRemove = isAiaa && ["journal", "booktitle", "volume", "number", "pages", "publisher"].includes(field);
-
       if (!origVal.trim() && foundVal.trim()) {
         enrichments.push({ field, original: origVal, found: foundVal, score: 0 });
         continue;
       }
       if (origVal.trim() && !foundVal.trim()) {
-        if (isAiaaRemove) {
-          hasDifference = true;
-          fieldDiffs.push({ field, original: origVal, found: "", score: 0, suggestedRemove: true });
-        }
         continue;
       }
 
@@ -484,6 +481,10 @@
     const foundJournal = merged.journal || "";
     if (original.booktitle && !original.journal && foundJournal)
       merged.booktitle = foundJournal;
+
+    if (original.author && merged.author && isMoreComplete(merged.author, original.author)) {
+      merged.author = original.author;
+    }
 
     const origTitle = original.title || "";
     const foundTitle = merged.title || "";
@@ -615,7 +616,8 @@
     const last = biblio.last_page || "";
     const pages = first && last ? `${first}-${last}` : (first || last || "");
     // OpenAlex reports DOIs as full URLs (https://doi.org/10.x); store the bare DOI.
-    const doi = (work.doi || "").replace(/^https?:\/\/(dx\.)?doi\.org\//i, "");
+    const rawDoi = work.doi || work.ids?.doi || "";
+    const doi = (rawDoi || "").replace(/^https?:\/\/(dx\.)?doi\.org\//i, "");
 
     return {
       title: work.title || work.display_name || "",
@@ -836,7 +838,7 @@
   }
 
   const VENUE_ABBREVIATIONS = {
-    // Journals
+    // Fluid Dynamics, Aerodynamics, Aerospace & Propulsion
     "Physics of Fluids": "Phys. Fluids",
     "Journal of Fluid Mechanics": "J. Fluid Mech.",
     "Journal of Computational Physics": "J. Comput. Phys.",
@@ -844,21 +846,106 @@
     "Journal of Aircraft": "J. Aircr.",
     "Journal of Propulsion and Power": "J. Propuls. Power",
     "Journal of Spacecraft and Rockets": "J. Spacecr. Rockets",
-    "Physical Review Letters": "Phys. Rev. Lett.",
-    "Physical Review": "Phys. Rev.",
     "Journal of Turbulence": "J. Turbul.",
     "Experiments in Fluids": "Exp. Fluids",
     "Computers & Fluids": "Comput. Fluids",
     "Annual Review of Fluid Mechanics": "Annu. Rev. Fluid Mech.",
     "Physical Review Fluids": "Phys. Rev. Fluids",
-    "Physical Review E": "Phys. Rev. E",
     "Experimental Thermal and Fluid Science": "Exp. Therm. Fluid Sci.",
     "International Journal of Heat and Fluid Flow": "Int. J. Heat Fluid Flow",
     "Journal of Aerospace Engineering": "J. Aerosp. Eng.",
     "Aerospace Science and Technology": "Aerosp. Sci. Technol.",
     "Progress in Aerospace Sciences": "Prog. Aerosp. Sci.",
+    "Fluid Dynamics Research": "Fluid Dyn. Res.",
+    "European Journal of Mechanics - B/Fluids": "Eur. J. Mech. B Fluids",
+    "International Journal of Multiphase Flow": "Int. J. Multiphase Flow",
+    "Theoretical and Computational Fluid Dynamics": "Theor. Comput. Fluid Dyn.",
+    "Flow, Turbulence and Combustion": "Flow Turbul. Combust.",
+    "Combustion and Flame": "Combust. Flame",
+    "Proceedings of the Combustion Institute": "Proc. Combust. Inst.",
+    "Journal of Fluid Science and Technology": "J. Fluid Sci. Technol.",
 
-    // Conferences
+    // Thermal Sciences, Heat Transfer & Energy
+    "Journal of Heat Transfer": "J. Heat Transfer",
+    "International Journal of Heat and Mass Transfer": "Int. J. Heat Mass Transfer",
+    "International Journal of Thermal Sciences": "Int. J. Therm. Sci.",
+    "Applied Thermal Engineering": "Appl. Therm. Eng.",
+    "Heat and Mass Transfer": "Heat Mass Transfer",
+    "Numerical Heat Transfer, Part A: Applications": "Numer. Heat Transfer, Part A",
+    "Numerical Heat Transfer, Part B: Fundamentals": "Numer. Heat Transfer, Part B",
+    "Energy": "Energy",
+    "Applied Energy": "Appl. Energy",
+    "Renewable and Sustainable Energy Reviews": "Renewable Sustainable Energy Rev.",
+    "Progress in Energy and Combustion Science": "Prog. Energy Combust. Sci.",
+
+    // Physics, Mechanics & General Science
+    "Physical Review Letters": "Phys. Rev. Lett.",
+    "Physical Review A": "Phys. Rev. A",
+    "Physical Review B": "Phys. Rev. B",
+    "Physical Review C": "Phys. Rev. C",
+    "Physical Review D": "Phys. Rev. D",
+    "Physical Review E": "Phys. Rev. E",
+    "Physical Review X": "Phys. Rev. X",
+    "Physical Review Applied": "Phys. Rev. Appl.",
+    "Physical Review Research": "Phys. Rev. Res.",
+    "Physical Review Materials": "Phys. Rev. Mater.",
+    "Physical Review": "Phys. Rev.",
+    "Reviews of Modern Physics": "Rev. Mod. Phys.",
+    "Applied Physics Letters": "Appl. Phys. Lett.",
+    "Journal of Applied Physics": "J. Appl. Phys.",
+    "Journal of Physics A: Mathematical and Theoretical": "J. Phys. A: Math. Theor.",
+    "Journal of Physics D: Applied Physics": "J. Phys. D: Appl. Phys.",
+    "Reports on Progress in Physics": "Rep. Prog. Phys.",
+    "Europhysics Letters": "EPL",
+    "European Physical Journal E": "Eur. Phys. J. E",
+    "Philosophical Transactions of the Royal Society A": "Phil. Trans. R. Soc. A",
+    "Philosophical Transactions of the Royal Society A: Mathematical, Physical and Engineering Sciences": "Phil. Trans. R. Soc. A",
+    "Philosophical Transactions of the Royal Society B": "Phil. Trans. R. Soc. B",
+    "Philosophical Transactions of the Royal Society": "Phil. Trans.",
+    "Proceedings of the Royal Society A": "Proc. R. Soc. A",
+    "Proceedings of the Royal Society A: Mathematical, Physical and Engineering Sciences": "Proc. R. Soc. A",
+    "Proceedings of the National Academy of Sciences": "Proc. Natl. Acad. Sci. U.S.A.",
+
+    // Mechanical & Materials Engineering, Numerical Methods
+    "Journal of Sound and Vibration": "J. Sound Vib.",
+    "Journal of Vibration and Acoustics": "J. Vib. Acoust.",
+    "Journal of Applied Mechanics": "J. Appl. Mech.",
+    "International Journal of Solids and Structures": "Int. J. Solids Struct.",
+    "Journal of the Mechanics and Physics of Solids": "J. Mech. Phys. Solids",
+    "Mechanics of Materials": "Mech. Mater.",
+    "Acta Materialia": "Acta Mater.",
+    "Scripta Materialia": "Scripta Mater.",
+    "Materials Science and Engineering: A": "Mater. Sci. Eng., A",
+    "Composites Science and Technology": "Compos. Sci. Technol.",
+    "Composites Part A: Applied Science and Manufacturing": "Compos. Part A Appl. Sci. Manuf.",
+    "Composites Part B: Engineering": "Compos. Part B Eng.",
+    "IEEE Transactions on Automatic Control": "IEEE Trans. Autom. Control",
+    "IEEE Transactions on Robotics": "IEEE Trans. Rob.",
+    "IEEE Control Systems Magazine": "IEEE Control Syst. Mag.",
+    "Automatica": "Automatica",
+    "SIAM Journal on Control and Optimization": "SIAM J. Control Optim.",
+    "SIAM Journal on Applied Mathematics": "SIAM J. Appl. Math.",
+    "SIAM Journal on Numerical Analysis": "SIAM J. Numer. Anal.",
+    "SIAM Journal on Scientific Computing": "SIAM J. Sci. Comput.",
+    "Journal of Scientific Computing": "J. Sci. Comput.",
+    "Computer Methods in Applied Mechanics and Engineering": "Comput. Methods Appl. Mech. Eng.",
+    "International Journal for Numerical Methods in Engineering": "Int. J. Numer. Methods Eng.",
+    "International Journal for Numerical Methods in Fluids": "Int. J. Numer. Methods Fluids",
+
+    // Chemistry & Chemical Engineering
+    "Journal of the American Chemical Society": "J. Am. Chem. Soc.",
+    "Chemical Reviews": "Chem. Rev.",
+    "Accounts of Chemical Research": "Acc. Chem. Res.",
+    "Angewandte Chemie International Edition": "Angew. Chem. Int. Ed.",
+    "Chemical Engineering Science": "Chem. Eng. Sci.",
+    "Industrial & Engineering Chemistry Research": "Ind. Eng. Chem. Res.",
+    "AIChE Journal": "AIChE J.",
+    "Journal of Physical Chemistry A": "J. Phys. Chem. A",
+    "Journal of Physical Chemistry B": "J. Phys. Chem. B",
+    "Journal of Physical Chemistry C": "J. Phys. Chem. C",
+    "The Journal of Chemical Physics": "J. Chem. Phys.",
+
+    // Computer Science & AI Conferences/Journals
     "Advances in Neural Information Processing Systems": "NeurIPS",
     "Neural Information Processing Systems": "NeurIPS",
     "International Conference on Machine Learning": "ICML",
@@ -912,6 +999,142 @@
       if (clean === abbrClean) return full;
     }
     return cleanVenue(name);
+  }
+
+  // ─── Title casing utilities ──────────────────────────────────────────
+  const TITLE_KNOWN_ACRONYMS = new Map([
+    ["dns", "DNS"], ["les", "LES"], ["rans", "RANS"], ["cfd", "CFD"],
+    ["aiaa", "AIAA"], ["ieee", "IEEE"], ["acm", "ACM"], ["jfm", "JFM"], ["pof", "POF"],
+    ["siam", "SIAM"], ["asme", "ASME"], ["aps", "APS"],
+    ["3d", "3D"], ["2d", "2D"], ["nasa", "NASA"], ["nato", "NATO"],
+    ["gpu", "GPU"], ["cpu", "CPU"], ["ai", "AI"], ["ml", "ML"],
+    ["cnn", "CNN"], ["rnn", "RNN"], ["lstm", "LSTM"], ["bert", "BERT"],
+    ["llm", "LLM"], ["gpt", "GPT"], ["arxiv", "arXiv"],
+    ["i", "I"], ["ii", "II"], ["iii", "III"], ["iv", "IV"], ["v", "V"],
+    ["vi", "VI"], ["vii", "VII"], ["viii", "VIII"], ["ix", "IX"], ["x", "X"],
+  ]);
+
+  const TITLE_LOWERCASE_WORDS = new Set([
+    "a", "an", "the",
+    "and", "but", "or", "nor", "for", "yet", "so",
+    "of", "in", "on", "at", "by", "for", "with", "to", "from", "into", "via", "per", "as", "about", "over", "under", "through"
+  ]);
+
+  function toTitleCaseWord(word, isFirst, isLast, afterMajorPunctuation) {
+    if (!word) return "";
+    if ((word.startsWith("{") && word.endsWith("}")) || word.includes("$") || word.startsWith("\\")) {
+      return word;
+    }
+
+    const match = /^([^\w]*)([\w-]+)([^\w]*)$/.exec(word);
+    if (!match) return word;
+    const [, prefix, core, suffix] = match;
+
+    const lower = core.toLowerCase();
+    let resultCore = core;
+
+    if (TITLE_KNOWN_ACRONYMS.has(lower)) {
+      resultCore = TITLE_KNOWN_ACRONYMS.get(lower);
+    } else if (core === core.toUpperCase() && /[A-Z]/.test(core) && core.length > 1) {
+      resultCore = core;
+    } else if (/[a-z][A-Z]/.test(core)) {
+      resultCore = core;
+    } else if (core.includes("-")) {
+      resultCore = core
+        .split("-")
+        .map((part, idx, arr) => toTitleCaseWord(part, isFirst && idx === 0, isLast && idx === arr.length - 1, false))
+        .join("-");
+    } else if (!isFirst && !isLast && !afterMajorPunctuation && TITLE_LOWERCASE_WORDS.has(lower)) {
+      resultCore = lower;
+    } else {
+      resultCore = lower.charAt(0).toUpperCase() + lower.slice(1);
+    }
+
+    return prefix + resultCore + suffix;
+  }
+
+  function toTitleCase(title) {
+    if (!title) return "";
+    const tokens = title.split(/(\s+)/);
+    const nonSpaceIndices = [];
+    for (let i = 0; i < tokens.length; i++) {
+      if (!/^\s*$/.test(tokens[i])) {
+        nonSpaceIndices.push(i);
+      }
+    }
+    if (nonSpaceIndices.length === 0) return title;
+
+    let afterPunct = false;
+    for (let idx = 0; idx < nonSpaceIndices.length; idx++) {
+      const i = nonSpaceIndices[idx];
+      const isFirst = (idx === 0);
+      const isLast = (idx === nonSpaceIndices.length - 1);
+
+      tokens[i] = toTitleCaseWord(tokens[i], isFirst, isLast, afterPunct);
+
+      const raw = tokens[i];
+      afterPunct = /[:\.\?!-]\s*$/.test(raw) || /:$/.test(raw);
+    }
+
+    return tokens.join("");
+  }
+
+  function toSentenceCaseWord(word, isFirst, afterMajorPunctuation) {
+    if (!word) return "";
+    if ((word.startsWith("{") && word.endsWith("}")) || word.includes("$") || word.startsWith("\\")) {
+      return word;
+    }
+
+    const match = /^([^\w]*)([\w-]+)([^\w]*)$/.exec(word);
+    if (!match) return word;
+    const [, prefix, core, suffix] = match;
+
+    const lower = core.toLowerCase();
+    let resultCore = core;
+
+    if (TITLE_KNOWN_ACRONYMS.has(lower)) {
+      resultCore = TITLE_KNOWN_ACRONYMS.get(lower);
+    } else if (core === core.toUpperCase() && /[A-Z]/.test(core) && core.length > 1) {
+      resultCore = core;
+    } else if (/[a-z][A-Z]/.test(core)) {
+      resultCore = core;
+    } else if (core.includes("-")) {
+      resultCore = core
+        .split("-")
+        .map((part, idx) => toSentenceCaseWord(part, isFirst && idx === 0, false))
+        .join("-");
+    } else if (isFirst || afterMajorPunctuation) {
+      resultCore = lower.charAt(0).toUpperCase() + lower.slice(1);
+    } else {
+      resultCore = lower;
+    }
+
+    return prefix + resultCore + suffix;
+  }
+
+  function toSentenceCase(title) {
+    if (!title) return "";
+    const tokens = title.split(/(\s+)/);
+    const nonSpaceIndices = [];
+    for (let i = 0; i < tokens.length; i++) {
+      if (!/^\s*$/.test(tokens[i])) {
+        nonSpaceIndices.push(i);
+      }
+    }
+    if (nonSpaceIndices.length === 0) return title;
+
+    let afterPunct = false;
+    for (let idx = 0; idx < nonSpaceIndices.length; idx++) {
+      const i = nonSpaceIndices[idx];
+      const isFirst = (idx === 0);
+
+      tokens[i] = toSentenceCaseWord(tokens[i], isFirst, afterPunct);
+
+      const raw = tokens[i];
+      afterPunct = /[:\.\?!-]\s*$/.test(raw) || /:$/.test(raw);
+    }
+
+    return tokens.join("");
   }
 
   // ─── Note cleaning ───────────────────────────────────────────────────
@@ -1101,6 +1324,8 @@
   exports.titleCaseIfAllCaps = titleCaseIfAllCaps;
   exports.cleanVenue = cleanVenue;
   exports.capitalizeVenue = capitalizeVenue;
+  exports.toTitleCase = toTitleCase;
+  exports.toSentenceCase = toSentenceCase;
   exports.generateCitationKey = generateCitationKey;
 
 })(typeof module !== "undefined" && module.exports ? module.exports : (window.BibLib = {}));
