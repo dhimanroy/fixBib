@@ -732,12 +732,107 @@
   }
 
   // ─── Venue abbreviation ──────────────────────────────────────────────
+  const VENUE_LOWERCASE_WORDS = new Set([
+    "a", "an", "the",
+    "and", "but", "or", "nor", "for", "yet", "so",
+    "of", "in", "on", "at", "by", "for", "with", "to", "from", "into", "via", "per", "as", "about", "over", "under", "through"
+  ]);
+
+  const VENUE_KNOWN_ACRONYMS = new Map([
+    ["ieee", "IEEE"],
+    ["acm", "ACM"],
+    ["aiaa", "AIAA"],
+    ["siam", "SIAM"],
+    ["asme", "ASME"],
+    ["aps", "APS"],
+    ["jfm", "JFM"],
+    ["eccomas", "ECCOMAS"],
+    ["iutam", "IUTAM"],
+    ["nasa", "NASA"],
+    ["nato", "NATO"],
+    ["a&a", "A&A"],
+    ["prl", "PRL"],
+    ["pre", "PRE"],
+    ["3d", "3D"],
+    ["2d", "2D"],
+    ["cfd", "CFD"],
+    ["les", "LES"],
+    ["dns", "DNS"],
+    ["rans", "RANS"],
+    ["ai", "AI"],
+    ["ml", "ML"],
+    ["nlp", "NLP"],
+    ["cv", "CV"],
+    ["arxiv", "arXiv"],
+  ]);
+
+  function capitalizeVenueWord(word, isFirst, isLast) {
+    if (!word) return "";
+    const lower = word.toLowerCase();
+
+    if (VENUE_KNOWN_ACRONYMS.has(lower)) {
+      return VENUE_KNOWN_ACRONYMS.get(lower);
+    }
+
+    if (word === word.toUpperCase() && /[A-Z]/.test(word) && word.length > 1) {
+      return word;
+    }
+
+    if (/[a-z][A-Z]/.test(word)) {
+      return word;
+    }
+
+    if (word.includes("-")) {
+      return word
+        .split("-")
+        .map((part, idx, arr) => capitalizeVenueWord(part, isFirst && idx === 0, isLast && idx === arr.length - 1))
+        .join("-");
+    }
+
+    if (!isFirst && !isLast && VENUE_LOWERCASE_WORDS.has(lower)) {
+      return lower;
+    }
+
+    return lower.charAt(0).toUpperCase() + lower.slice(1);
+  }
+
+  function capitalizeVenue(name) {
+    if (!name) return "";
+    const tokens = name.split(/(\s+)/);
+    const nonSpaceIndices = [];
+    for (let i = 0; i < tokens.length; i++) {
+      if (!/^\s*$/.test(tokens[i])) {
+        nonSpaceIndices.push(i);
+      }
+    }
+    if (nonSpaceIndices.length === 0) return name;
+
+    for (let idx = 0; idx < nonSpaceIndices.length; idx++) {
+      const i = nonSpaceIndices[idx];
+      const isFirst = (idx === 0);
+      const isLast = (idx === nonSpaceIndices.length - 1);
+      tokens[i] = capitalizeVenueWord(tokens[i], isFirst, isLast);
+    }
+
+    return tokens.join("");
+  }
+
   function cleanVenue(name) {
     if (!name) return "";
     let clean = name.trim();
     // Strip leading "The " or "the " case-insensitively
     clean = clean.replace(/^[Tt]he\s+/, "");
-    return clean;
+
+    // Match case-insensitively against known venue keys in VENUE_ABBREVIATIONS
+    const cleanNormalized = clean.toLowerCase().replace(/[^a-z0-9\s&,]/g, "");
+    for (const full of Object.keys(VENUE_ABBREVIATIONS)) {
+      const fullNormalized = full.toLowerCase().replace(/[^a-z0-9\s&,]/g, "");
+      if (cleanNormalized === fullNormalized) {
+        return full;
+      }
+    }
+
+    return capitalizeVenue(clean);
   }
 
   const VENUE_ABBREVIATIONS = {
@@ -806,7 +901,7 @@
       const fullClean = full.toLowerCase().replace(/[^a-z0-9\s&,]/g, "");
       if (clean === fullClean || clean.includes(fullClean)) return abbr;
     }
-    return name;
+    return cleanVenue(name);
   }
 
   function expandVenue(name) {
@@ -816,7 +911,7 @@
       const abbrClean = abbr.toLowerCase().replace(/[^a-z0-9\s&,]/g, "");
       if (clean === abbrClean) return full;
     }
-    return name;
+    return cleanVenue(name);
   }
 
   // ─── Note cleaning ───────────────────────────────────────────────────
@@ -1005,6 +1100,7 @@
   exports.entryMatchesQuery = entryMatchesQuery;
   exports.titleCaseIfAllCaps = titleCaseIfAllCaps;
   exports.cleanVenue = cleanVenue;
+  exports.capitalizeVenue = capitalizeVenue;
   exports.generateCitationKey = generateCitationKey;
 
 })(typeof module !== "undefined" && module.exports ? module.exports : (window.BibLib = {}));

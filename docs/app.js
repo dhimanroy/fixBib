@@ -1691,11 +1691,11 @@
   year = {2017},
 }
 
-@article{tour_fabricated2099,
-  title = {Totally Fabricated Paper Title QZX999},
-  author = {Nobody, N.},
-  journal = {Journal of Nonexistence},
-  year = {2099},
+@article{tour_unverified2099,
+  title = {Unverified Sample Reference Title QZX999},
+  author = {Unknown, A.},
+  journal = {Journal of Demonstration},
+  year = {2025},
 }`;
 
   function shouldAutoShowOnboarding() {
@@ -1717,7 +1717,7 @@
   const introOnboardingSteps = [
     {
       title: "Welcome",
-      body: "fixBib checks each entry against CrossRef and Semantic Scholar — wrong metadata, missing DOIs, duplicates, and citations that don’t exist online (including AI hallucinations). Your file stays in the browser.",
+      body: "fixBib cross-checks your bibliography against CrossRef, Semantic Scholar, and OpenAlex. It automatically fills missing DOIs, standardizes journal casing and abbreviations, cleans author formatting, and formats aerospace papers (like AIAA). Your file stays 100% in your browser.",
       target: null,
     },
     {
@@ -1727,7 +1727,7 @@
     },
     {
       title: "Sample loaded",
-      body: "We’ve switched to the paste tab and inserted a tiny <strong>two-entry sample</strong>: one famous paper with intentional wrong venue text, and one fake title so you can see how mismatches look.",
+      body: "We’ve loaded a <strong>two-entry sample</strong>: one entry with missing DOIs/incorrect venue text to show auto-updating, and one unverified title to demonstrate how status flags work.",
       target: "#bib-paste",
       onEnter: () => {
         switchToPasteTab();
@@ -1737,7 +1737,7 @@
     },
     {
       title: "Run verification",
-      body: "Click <strong>Verify pasted BibTeX</strong> when you’re ready. The app queries CrossRef and Semantic Scholar (a short wait per entry). <strong>When it finishes, the tour continues</strong> and walks through both sample results — updated vs not found — plus settings.",
+      body: "Click <strong>Verify pasted BibTeX</strong> when you’re ready. The app queries online databases to complete missing metadata and verify each paper. <strong>When it finishes, the tour continues</strong> to walk through auto-updates and customizable settings.",
       target: "#btn-verify-paste",
     },
     {
@@ -1918,8 +1918,8 @@
         panelTop: true,
       },
       {
-        title: "Fake entry — not found",
-        body: "This title is <strong>made up</strong>. Nothing credible matched online, so it’s labeled <strong>Not found</strong> — what you’d see for hallucinated or mistaken references.",
+        title: "Unverified entry — not found",
+        body: "Entries with no online database match are labeled <strong>Not found</strong>. This helps you identify missing references, fix typos, or keep your original text as-is.",
         target: ".entry-list .entry-card:nth-child(2)",
         panelTop: true,
       },

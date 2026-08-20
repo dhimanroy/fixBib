@@ -635,11 +635,22 @@ test("returns null for empty candidates", () => {
 // ═══════════════════════════════════════════════════════════════════════
 console.log("\n── cleanVenue ──");
 
-test("strips leading 'The ' or 'the ' case-insensitively", () => {
+test("strips leading 'The ' or 'the ' case-insensitively and capitalizes journal names", () => {
   assert.strictEqual(lib.cleanVenue("The Physics of Fluids"), "Physics of Fluids");
   assert.strictEqual(lib.cleanVenue("the Journal of Fluid Mechanics"), "Journal of Fluid Mechanics");
   assert.strictEqual(lib.cleanVenue("Physics of Fluids"), "Physics of Fluids");
+  assert.strictEqual(lib.cleanVenue("Physics of fluids"), "Physics of Fluids");
+  assert.strictEqual(lib.cleanVenue("physics of fluids"), "Physics of Fluids");
+  assert.strictEqual(lib.cleanVenue("the physics of fluids"), "Physics of Fluids");
+  assert.strictEqual(lib.cleanVenue("journal of fluid mechanics"), "Journal of Fluid Mechanics");
+  assert.strictEqual(lib.cleanVenue("journal of computational physics"), "Journal of Computational Physics");
   assert.strictEqual(lib.cleanVenue(""), "");
+});
+
+test("capitalizes general venue names with Title Case and preserves acronyms", () => {
+  assert.strictEqual(lib.capitalizeVenue("ieee transactions on robotics"), "IEEE Transactions on Robotics");
+  assert.strictEqual(lib.capitalizeVenue("journal of physical oceanography"), "Journal of Physical Oceanography");
+  assert.strictEqual(lib.capitalizeVenue("international journal of heat and fluid flow"), "International Journal of Heat and Fluid Flow");
 });
 
 // ═══════════════════════════════════════════════════════════════════════
