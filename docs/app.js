@@ -754,6 +754,27 @@
     updateEntryEmptyState();
   }
 
+  function getEffectiveEntry(idx) {
+    const entry = parsedEntries[idx];
+    if (!entry) return null;
+    const out = { ...entry };
+    const edits = fieldEdits[idx] || {};
+    for (const [field, fe] of Object.entries(edits)) {
+      if (!fe) continue;
+      if (fe.action === "found" || fe.action === "custom") {
+        if (fe.value) out[field] = fe.value;
+        else delete out[field];
+      } else if (fe.action === "remove") {
+        delete out[field];
+      } else if (fe.action === "original") {
+        if (fe.value) out[field] = fe.value;
+        else if (entry[field]) out[field] = entry[field];
+      }
+    }
+    out._source = "user-verified";
+    return out;
+  }
+
   function renderEntryCard(r) {
     const card = document.createElement("div");
     card.className = `entry-card status-${r.status}`;
@@ -898,10 +919,14 @@
 
     let actionsHTML = "";
     const hasEditable = Object.keys(fieldEdits[idx]).length > 0;
-    if (hasEditable && hasSuggestion && hasDiffs) {
-      const allFound = r.field_diffs.every(d => (fieldEdits[idx][d.field] || {}).action === "found");
-      const allOriginal = r.field_diffs.every(d => (fieldEdits[idx][d.field] || {}).action === "original");
-      actionsHTML = `<div class="entry-actions">
+    const isSaved = r._isSavedCache || false;
+
+    if (r.status !== "not_found") {
+      const showBulkBtns = hasEditable && hasSuggestion && hasDiffs;
+      const allFound = showBulkBtns && r.field_diffs.every(d => (fieldEdits[idx][d.field] || {}).action === "found");
+      const allOriginal = showBulkBtns && r.field_diffs.every(d => (fieldEdits[idx][d.field] || {}).action === "original");
+
+      const bulkBtnsHTML = showBulkBtns ? `
         <button class="seg-btn btn-accept-all ${allFound ? "active-accept" : ""}" data-entry="${idx}">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
           Accept all
@@ -909,7 +934,21 @@
         <button class="seg-btn btn-revert-all ${allOriginal ? "active-revert" : ""}" data-entry="${idx}">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 105.64-11.36L1 10"/></svg>
           Keep original
-        </button>
+        </button>` : "";
+
+      const updateBtnHTML = isSaved ? `
+        <button class="seg-btn btn-save-cache is-updated" data-entry="${idx}" disabled title="Cache updated with selected values">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          Updated
+        </button>` : `
+        <button class="seg-btn btn-save-cache" data-entry="${idx}" title="Save selected and modified values to local cache">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          Update Cache
+        </button>`;
+
+      actionsHTML = `<div class="entry-actions">
+        ${bulkBtnsHTML}
+        ${updateBtnHTML}
       </div>`;
     }
 
@@ -973,6 +1012,56 @@
     else entryList.appendChild(card);
     updateEntryEmptyState();
   }
+
+  function markEntryDirty(idx, card) {
+    if (results[idx]) results[idx]._isSavedCache = false;
+    if (!card) card = entryList.querySelector(`.entry-card[data-index="${idx}"]`);
+    if (!card) return;
+    const btn = card.querySelector(".btn-save-cache");
+    if (btn && btn.disabled) {
+      btn.disabled = false;
+      btn.classList.remove("is-updated");
+      btn.setAttribute("title", "Save selected and modified values to local cache");
+      btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Update Cache`;
+    }
+  }
+
+  // ─── Save / Update Cache button handler ─────────────────────────────
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest(".btn-save-cache");
+    if (!btn || btn.disabled) return;
+    const idx = parseInt(btn.dataset.entry, 10);
+    if (isNaN(idx) || !parsedEntries[idx]) return;
+
+    const effective = getEffectiveEntry(idx);
+    if (!effective) return;
+
+    // Save effective entry to localStorage cache
+    B.saveToCache(parsedEntries[idx], effective);
+
+    // Update session results
+    if (results[idx]) {
+      results[idx].isCached = true;
+      results[idx].found = { ...effective, isCached: true };
+      results[idx]._isSavedCache = true;
+
+      // Re-compare to update status
+      const cmp = B.compareEntry(parsedEntries[idx], results[idx].found);
+      results[idx].status = cmp.status;
+      results[idx].title_score = cmp.title_score;
+      results[idx].field_diffs = cmp.field_diffs;
+      results[idx].suggested = cmp.suggested;
+    }
+
+    // Re-render card to reflect updated status, cached tag, and "Updated" disabled button
+    if (results[idx]) {
+      renderEntryCard(results[idx]);
+    }
+
+    updateDynamicSummary();
+    updateStorageStats();
+    updatePreview();
+  });
 
   // ─── Refetch button handler ──────────────────────────────────────
   document.addEventListener("click", async (e) => {
@@ -1139,6 +1228,7 @@
 
       syncRowState(row, "original");
       syncBulkBtns(row.closest(".entry-card"), idx);
+      markEntryDirty(idx, row.closest(".entry-card"));
       updatePreview();
       return;
     }
@@ -1162,6 +1252,7 @@
 
       syncRowState(row, "found");
       syncBulkBtns(row.closest(".entry-card"), idx);
+      markEntryDirty(idx, row.closest(".entry-card"));
       updatePreview();
       return;
     }
@@ -1245,6 +1336,7 @@
         syncRowState(row, "remove");
       }
       syncBulkBtns(row.closest(".entry-card"), idx);
+      markEntryDirty(idx, row.closest(".entry-card"));
       updatePreview();
       return;
     }
@@ -1289,6 +1381,7 @@
 
     syncRowState(row, action);
     syncBulkBtns(row.closest(".entry-card"), idx);
+    markEntryDirty(idx, row.closest(".entry-card"));
     updatePreview();
   });
 
@@ -1307,6 +1400,7 @@
     if (span.classList.contains("pill-suggested")) span.classList.add("active");
     syncRowState(row, "custom");
     syncBulkBtns(row.closest(".entry-card"), idx);
+    markEntryDirty(idx, span.closest(".entry-card"));
     updatePreview();
   });
 
@@ -1419,6 +1513,7 @@
       }
     });
     syncBulkBtns(card, idx);
+    markEntryDirty(idx, card);
     updatePreview();
   });
 
@@ -1714,12 +1809,26 @@
       } else if (s.pubFormat === "aiaa") {
         if (out.journal) out.journal = B.expandVenue(out.journal);
         if (out.booktitle) out.booktitle = B.expandVenue(out.booktitle);
+      } else if (s.pubFormat === "custom") {
+        if (s.customJournalFormat === "abbreviated") {
+          if (out.journal) out.journal = B.abbreviateVenue(out.journal);
+          if (out.booktitle) out.booktitle = B.abbreviateVenue(out.booktitle);
+        } else if (s.customJournalFormat === "full") {
+          if (out.journal) out.journal = B.expandVenue(out.journal);
+          if (out.booktitle) out.booktitle = B.expandVenue(out.booktitle);
+        }
       }
 
       if (s.pubFormat === "jfm_pof" || s.pubFormat === "jfm" || s.pubFormat === "pof") {
         if (out.title) out.title = B.toSentenceCase(out.title);
       } else if (s.pubFormat === "aiaa") {
         if (out.title) out.title = B.toTitleCase(out.title);
+      } else if (s.pubFormat === "custom") {
+        if (s.customTitleCase === "sentence") {
+          if (out.title) out.title = B.toSentenceCase(out.title);
+        } else if (s.customTitleCase === "title") {
+          if (out.title) out.title = B.toTitleCase(out.title);
+        }
       }
 
       const aiaaPaperNum = B.getAiaaPaperNumber(out) || B.getAiaaPaperNumber(r?.suggested);
@@ -1930,8 +2039,26 @@
 
   [optRemoveNotFound, optCleanNotes, optPreferPublished, optUpdateKeys].forEach(el =>
     el.addEventListener("change", updatePreview));
+
+  function updateCustomPubControlsVisibility() {
+    const customControls = document.getElementById("custom-pub-controls");
+    const isCustom = (document.querySelector('input[name="pub-format"]:checked') || {}).value === "custom";
+    if (customControls) {
+      customControls.style.display = isCustom ? "flex" : "none";
+    }
+  }
+
   $$('input[name="pub-format"]').forEach(el =>
-    el.addEventListener("change", updatePreview));
+    el.addEventListener("change", () => {
+      updateCustomPubControlsVisibility();
+      updatePreview();
+    }));
+
+  ["custom-title-case", "custom-journal-format"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener("change", updatePreview);
+  });
+
   optMaxAuthors.addEventListener("change", () => {
     updateAuthorPills();
     updatePreview();
@@ -1940,6 +2067,10 @@
     el.addEventListener("change", updatePreview));
 
   function getSettings() {
+    const pubFormat = (document.querySelector('input[name="pub-format"]:checked') || {}).value || "default";
+    const customTitleCase = (document.getElementById("custom-title-case") || {}).value || "sentence";
+    const customJournalFormat = (document.getElementById("custom-journal-format") || {}).value || "abbreviated";
+
     return {
       removeDuplicates: optRemoveDuplicates.checked,
       dedupBy: (document.querySelector('input[name="dedup-criteria"]:checked') || {}).value || "title",
@@ -1947,7 +2078,9 @@
       cleanNotes: optCleanNotes.checked,
       maxAuthors: parseInt(optMaxAuthors.value) || 0,
       preferPublished: optPreferPublished.checked,
-      pubFormat: (document.querySelector('input[name="pub-format"]:checked') || {}).value || "default",
+      pubFormat,
+      customTitleCase,
+      customJournalFormat,
       updateKeys: optUpdateKeys.checked,
     };
   }

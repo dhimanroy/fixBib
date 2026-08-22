@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://dhimanroy.github.io/fixBib/sitemap.xml

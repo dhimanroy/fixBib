@@ -6,12 +6,13 @@
   <meta name="google-site-verification" content="Ec53uaP67xWogWFEI0Asj4FyQZ3RjAtHp6CcQckrWOI" />
 
   <title>fixBib — Verify &amp; Format BibTeX for Academic &amp; Aerospace Publications</title>
-  <meta name="description" content="Free online tool to verify and format BibTeX entries according to prescribed publication formats like AIAA Journal and JFM or PoF. Automatically formats titles, abbreviates journal names, verifies DOIs, and cleans references in your browser." />
-  <meta name="keywords" content="BibTeX, bibliography checker, verify references, AIAA, JFM, POF, Aerospace, publication format, journal abbreviation, LaTeX, CrossRef, Semantic Scholar, OpenAlex, DOI, citation checker, academic references, .bib file, Overleaf, BibLaTeX, reference manager" />
+  <meta name="description" content="Free online tool to verify and format BibTeX entries. Supports preset publication styles (AIAA, JFM, PoF) and custom formatting for Publication Title casing and Journal Name abbreviations. Automatically verifies DOIs, cleans notes, and standardizes references in your browser." />
+  <meta name="keywords" content="BibTeX, bibliography checker, verify references, AIAA, JFM, POF, Aerospace, publication format, custom format, journal abbreviation, LaTeX, CrossRef, Semantic Scholar, OpenAlex, DOI, citation checker, academic references, .bib file, Overleaf, BibLaTeX, reference manager" />
   <meta name="author" content="merfanian" />
   <meta name="contributor" content="dhimanroy" />
   <meta name="robots" content="index, follow" />
   <link rel="canonical" href="https://dhimanroy.github.io/fixBib/" />
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="./sitemap.xml" />
   <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
 
   <meta name="google-site-verification" content="M-kXoop130dm82SBPVX72_msafA3-TB7VWkPbrm82FU" />
@@ -19,13 +20,13 @@
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://dhimanroy.github.io/fixBib/" />
   <meta property="og:title" content="fixBib — Verify &amp; Format BibTeX for Academic &amp; Aerospace Publications" />
-  <meta property="og:description" content="Free browser-based tool to format and verify BibTeX entries according to prescribed publication formats (AIAA Journal, JFM or PoF). Automatically formats titles, journal names, DOIs, and citation keys." />
+  <meta property="og:description" content="Free browser-based tool to format and verify BibTeX entries. Supports preset publication styles (AIAA, JFM, PoF) and custom formatting for Publication Title casing and Journal Name abbreviations." />
   <meta property="og:site_name" content="fixBib" />
   <meta property="og:image" content="https://dhimanroy.github.io/fixBib/og-image.png" />
 
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="fixBib — Verify &amp; Format BibTeX for Academic &amp; Aerospace Publications" />
-  <meta name="twitter:description" content="Format and verify BibTeX entries according to prescribed publication formats (AIAA Journal, JFM or PoF). Automatically formats titles, journal names, DOIs, and citation keys." />
+  <meta name="twitter:description" content="Free browser-based tool to format and verify BibTeX entries. Supports preset publication styles (AIAA, JFM, PoF) and custom formatting for Publication Title casing and Journal Name abbreviations." />
 
   <script type="application/ld+json">
   {
@@ -33,12 +34,12 @@
     "@type": "WebApplication",
     "name": "fixBib",
     "url": "https://dhimanroy.github.io/fixBib/",
-    "description": "Free online tool to verify and format BibTeX bibliography entries according to prescribed publication formats like AIAA Journal and JFM or PoF. Formats titles, journal names, AIAA conference entries, and citation keys.",
+    "description": "Free online tool to verify and format BibTeX bibliography entries. Supports preset publication styles (AIAA, JFM, PoF) and custom formatting for Publication Title casing and Journal Name abbreviations.",
     "applicationCategory": "UtilitiesApplication",
     "operatingSystem": "Any",
     "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
     "browserRequirements": "Requires a modern web browser with JavaScript enabled",
-    "featureList": ["BibTeX verification", "Publication Formats (AIAA, JFM or PoF)", "DOI verification", "Journal abbreviations", "Citation key generation", "Field alignment"],
+    "featureList": ["BibTeX verification", "Publication Formats (AIAA, JFM, PoF, Custom)", "DOI verification", "Journal abbreviations", "Citation key generation", "Field alignment"],
     "isAccessibleForFree": true,
     "license": "https://opensource.org/licenses/MIT"
   }
@@ -217,7 +218,7 @@
         <div class="step">
           <div class="step-num">4</div>
           <h3>Download</h3>
-          <p>Download or copy your corrected <code>.bib</code> file formatted in your preferred publication style (AIAA Journal, JFM or PoF, or As Input) with all custom settings applied. Ready for Overleaf or LaTeX.</p>
+          <p>Download or copy your corrected <code>.bib</code> file formatted in your chosen publication style with all custom settings applied. Ready for Overleaf or LaTeX.</p>
         </div>
       </div>
     </section>
@@ -250,8 +251,8 @@
           <div class="feature-icon-wrapper">
             <svg class="feature-card-icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 3.5A2.5 2.5 0 0 1 6.5 6H20M4 6v13.5M20 6v13.5"/><path d="M6 6H18M6 10H18M6 14H18"/></svg>
           </div>
-          <h3>Publication Formats</h3>
-          <p>Robust prescribed formatting for AIAA Journal, JFM, and PoF. Formats titles (Title vs Sentence Case) and journal names with comprehensive ISO 4 scientific abbreviations (e.g. <em>J. Fluid Mech.</em>, <em>Phys. Fluids</em>).</p>
+          <h3>Publication Formats &amp; Custom Styling</h3>
+          <p>Flexible formatting for preset journal styles (AIAA Journal, JFM, PoF) or configure Custom formatting for Publication Title casing (Sentence vs. Title Case) and Journal Name (Full Form vs. ISO 4 Abbreviations).</p>
         </div>
       </div>
     </section>
@@ -331,6 +332,25 @@
             <label class="radio-label"><input type="radio" name="pub-format" value="default" checked /> As Input</label>
             <label class="radio-label"><input type="radio" name="pub-format" value="aiaa" /> AIAA Journal</label>
             <label class="radio-label"><input type="radio" name="pub-format" value="jfm_pof" /> JFM or PoF</label>
+            <label class="radio-label"><input type="radio" name="pub-format" value="custom" id="pub-format-custom" /> Custom</label>
+          </div>
+          <div class="custom-pub-controls" id="custom-pub-controls" style="display: none;">
+            <div class="custom-control-row">
+              <span class="custom-control-label">Publication Title:</span>
+              <select id="custom-title-case" class="custom-select">
+                <option value="sentence">Sentence case</option>
+                <option value="title">Title Case</option>
+                <option value="as_input">As Input</option>
+              </select>
+            </div>
+            <div class="custom-control-row">
+              <span class="custom-control-label">Journal Name:</span>
+              <select id="custom-journal-format" class="custom-select">
+                <option value="abbreviated">Abbreviated</option>
+                <option value="full">Full Form</option>
+                <option value="as_input">As Input</option>
+              </select>
+            </div>
           </div>
           <div class="settings-row">
             <svg class="setting-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M11 12l9-9M17 3l4 4M14 6l3 3"/></svg>

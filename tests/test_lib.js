@@ -661,6 +661,8 @@ test("abbreviates known venues", () => {
   assert.strictEqual(lib.abbreviateVenue("International Conference on Machine Learning"), "ICML");
   assert.strictEqual(lib.abbreviateVenue("Physics of Fluids"), "Phys. Fluids");
   assert.strictEqual(lib.abbreviateVenue("Journal of Fluid Mechanics"), "J. Fluid Mech.");
+  assert.strictEqual(lib.abbreviateVenue("Applied Mathematics and Mechanics"), "Appl. Math. Mech.");
+  assert.strictEqual(lib.abbreviateVenue("Journal of the Aeronautical Sciences"), "J. Aeronaut. Sci.");
 });
 
 test("returns original for unknown venues", () => {
@@ -700,6 +702,7 @@ test("converts title to Sentence Case properly", () => {
   assert.strictEqual(lib.toSentenceCase("Attention Is All You Need"), "Attention is all you need");
   assert.strictEqual(lib.toSentenceCase("Pressure Fluctuations in a Supersonic Boundary Layer: A Direct Study"), "Pressure fluctuations in a supersonic boundary layer: A direct study");
   assert.strictEqual(lib.toSentenceCase("Direct numerical simulation of {DNS} and LES"), "Direct numerical simulation of {DNS} and LES");
+  assert.strictEqual(lib.toSentenceCase("Effects of the reynolds number on the mean skin friction decomposition in turbulent channel flows"), "Effects of the Reynolds number on the mean skin friction decomposition in turbulent channel flows");
 });
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -989,6 +992,35 @@ test("saves and retrieves minimal payload from cache", () => {
   assert.strictEqual(cached.isCached, true);
   assert.strictEqual(cached.author, "Huang, J.");
   assert.strictEqual(cached.year, "2020");
+
+  delete global.localStorage;
+});
+
+test("saveToCache preserves user-verified edits across title and doi keys", () => {
+  global.localStorage = {
+    _data: {},
+    getItem(k) { return this._data[k] || null; },
+    setItem(k, v) { this._data[k] = v; },
+    removeItem(k) { delete this._data[k]; },
+    clear() { this._data = {}; },
+    get length() { return Object.keys(this._data).length; },
+    key(i) { return Object.keys(this._data)[i] || null; }
+  };
+
+  const orig = { title: "Time Dependent Boundary Conditions for Hyperbolic Systems", pages: "1" };
+  const verified = { title: "Time Dependent Boundary Conditions for Hyperbolic Systems", author: "Thompson, Kevin W.", year: "1987", pages: "1-24", doi: "10.1016/0021-9991(87)90041-6", _source: "user-verified" };
+
+  lib.saveToCache(orig, verified);
+
+  const cachedByTitle = lib.getFromCache(orig);
+  const cachedByDoi = lib.getFromCache({ doi: "10.1016/0021-9991(87)90041-6" });
+
+  assert.ok(cachedByTitle);
+  assert.strictEqual(cachedByTitle.pages, "1-24");
+  assert.strictEqual(cachedByTitle._source, "user-verified");
+
+  assert.ok(cachedByDoi);
+  assert.strictEqual(cachedByDoi.pages, "1-24");
 
   delete global.localStorage;
 });

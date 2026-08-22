@@ -20,7 +20,7 @@ This project is based on the original [BibTeX Verifier](https://github.com/merfa
 ### What it does
 
 <p align="center">
-  <sub><strong>Prescribed Publication Formats</strong> (AIAA, JFM, PoF) &middot; API waterfall &middot; lightweight local caching &middot; full author name preservation &middot; journal abbreviations &middot; citation keys &middot; field alignment</sub>
+  <sub><strong>Preset & Custom Publication Formats</strong> (AIAA, JFM, PoF, Custom) &middot; API waterfall &middot; lightweight local caching &middot; full author name preservation &middot; journal abbreviations &middot; citation keys &middot; field alignment</sub>
 </p>
 
 <br/>
@@ -35,7 +35,7 @@ Runs **100% in your browser** — no install, no server, no account required. Qu
 
 | Common BibTeX Issues | What fixBib does |
 |----------------------|------------------|
-| Target journal requires specific title casing & journal formatting | Select prescribed formats (**AIAA Journal**, **JFM or PoF**, or **As Input**) to format titles (Title Case vs Sentence Case), journal names, and AIAA conference papers instantly |
+| Target journal requires specific title casing & journal formatting | Select preset formats (**AIAA Journal**, **JFM or PoF**, **Custom**, or **As Input**) to format titles (Sentence vs. Title Case) and journal names (Full Form vs. Abbreviated) instantly |
 | Slow lookups & API rate limits (429 errors) | Uses an intelligent **API Waterfall (CrossRef &rarr; Semantic Scholar &rarr; OpenAlex)** and **lightweight local caching** of essential fields to eliminate redundant network calls |
 | Downgraded author names | Preserves full author names (e.g., *Huang, Junji*) and prevents APIs from replacing them with initials |
 | AIAA paper formatting varies | Formats AIAA conference papers as `@misc` with `howpublished` for AIAA Journal, or `@inproceedings` with `note` for JFM/PoF |
@@ -48,12 +48,15 @@ Runs **100% in your browser** — no install, no server, no account required. Qu
 - **As Input**: Cleans journal names and verifies metadata while preserving original title casing.
 - **AIAA Journal**:
   - Publication Title: **Title Case** (e.g., *Simulation and Modeling of Cold-Wall Hypersonic...*)
-  - Journal Name: **Full Name** (e.g., *Journal of Fluid Mechanics*)
+  - Journal Name: **Full Form** (e.g., *Journal of Fluid Mechanics*)
   - AIAA Conference Papers: Formatted as `@misc` with `howpublished = {AIAA Paper 2020-0571}`.
 - **JFM or PoF**:
   - Publication Title: **Sentence Case** (e.g., *Simulation and modeling of cold-wall hypersonic...*)
   - Journal Name: **Abbreviated ISO standard** (e.g., *J. Fluid Mech.*, *Phys. Fluids*, *J. Comput. Phys.*, *Phil. Trans. R. Soc. A*)
   - AIAA Conference Papers: Kept as `@inproceedings` with `note = {AIAA Paper 2020-0571}` and `booktitle`.
+- **Custom**:
+  - Publication Title: Choose **Sentence case**, **Title Case**, or **As Input**.
+  - Journal Name: Choose **Abbreviated**, **Full Form**, or **As Input**.
 
 ---
 
@@ -61,7 +64,7 @@ Runs **100% in your browser** — no install, no server, no account required. Qu
 
 - **API Waterfall & Intelligent Fallbacks**: Queries CrossRef primary, Semantic Scholar secondary, and OpenAlex final fallback for fast, resilient metadata lookup.
 - **Lightweight Local Storage Caching**: Stores only essential standardized fields in browser storage to eliminate redundant API calls, avoid rate limits, and enable instant re-verification.
-- **Prescribed Publication Formatting**: One-click formatting for AIAA Journal, JFM, PoF, and custom entry preferences.
+- **Preset & Custom Publication Formatting**: One-click formatting for AIAA Journal, JFM, PoF, or fully configurable Custom controls.
 - **Author Full Name Protection**: Automatically prevents APIs from downgrading full author names to initials.
 - **Comprehensive Science & Engineering Abbreviations**: Built-in dictionary supporting standard ISO 4 journal abbreviations across aerospace, fluid dynamics, thermal sciences, physics, chemistry, and computer science.
 - **Citation Key Generator**: Standardized keys formatted as `[author][year][title word]` (e.g. `huang2020simulation`).

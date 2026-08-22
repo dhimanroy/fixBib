@@ -15,12 +15,12 @@
 
   // ─── LaTeX helpers ───────────────────────────────────────────────────
   const LATEX_ACCENT_MAP = {
-    "\\'a":"á", "\\'e":"é", "\\'i":"í", "\\'o":"ó", "\\'u":"ú",
-    "\\`a":"à", "\\`e":"è", "\\`i":"ì", "\\`o":"ò", "\\`u":"ù",
-    '\\"a':"ä", '\\"e':"ë", '\\"i':"ï", '\\"o':"ö", '\\"u':"ü",
-    "\\~n":"ñ", "\\~a":"ã", "\\~o":"õ",
-    "\\^a":"â", "\\^e":"ê", "\\^i":"î", "\\^o":"ô", "\\^u":"û",
-    "\\c{c}":"ç", "\\c c":"ç", "{\\ss}":"ß",
+    "\\'a": "á", "\\'e": "é", "\\'i": "í", "\\'o": "ó", "\\'u": "ú",
+    "\\`a": "à", "\\`e": "è", "\\`i": "ì", "\\`o": "ò", "\\`u": "ù",
+    '\\"a': "ä", '\\"e': "ë", '\\"i': "ï", '\\"o': "ö", '\\"u': "ü",
+    "\\~n": "ñ", "\\~a": "ã", "\\~o": "õ",
+    "\\^a": "â", "\\^e": "ê", "\\^i": "î", "\\^o": "ô", "\\^u": "û",
+    "\\c{c}": "ç", "\\c c": "ç", "{\\ss}": "ß",
   };
 
   function stripLatex(text) {
@@ -196,9 +196,9 @@
       const type = entry.ENTRYTYPE || "misc";
       const id = entry.ID || "unknown";
       lines.push(`@${type}{${id},`);
-      
+
       const printedFields = new Set();
-      
+
       function formatField(k, v) {
         const prefix = " ".repeat(indentPre);
         const nameLen = k.length;
@@ -213,7 +213,7 @@
           printedFields.add(k);
         }
       }
-      
+
       for (const [k, v] of Object.entries(entry)) {
         if (k === "ENTRYTYPE" || k === "ID" || k.startsWith("_") || printedFields.has(k)) continue;
         lines.push(formatField(k, v));
@@ -371,7 +371,7 @@
       }
     }
     const isAiaaConf = (entry.journal && /AIAA/i.test(entry.journal) && /(scitech|aviation|aerospace|meeting|forum|conference)/i.test(entry.journal)) ||
-                       (entry.booktitle && /AIAA/i.test(entry.booktitle) && /(scitech|aviation|aerospace|meeting|forum|conference)/i.test(entry.booktitle));
+      (entry.booktitle && /AIAA/i.test(entry.booktitle) && /(scitech|aviation|aerospace|meeting|forum|conference)/i.test(entry.booktitle));
     if (isAiaaConf && entry.year) {
       const pageVal = (entry.pages || entry.number || "").trim();
       if (pageVal && /^\d+$/.test(pageVal)) {
@@ -694,7 +694,7 @@
     if (a.year && b.year) {
       const ya = parseInt(a.year, 10), yb = parseInt(b.year, 10);
       if (Number.isFinite(ya) && Number.isFinite(yb) &&
-          Math.abs(ya - yb) > PREPRINT_YEAR_TOLERANCE) return false;
+        Math.abs(ya - yb) > PREPRINT_YEAR_TOLERANCE) return false;
     }
     const aa = extractLastNames(a.author), ba = extractLastNames(b.author);
     if (aa.size && ba.size) {
@@ -852,6 +852,10 @@
     "Journal of Aircraft": "J. Aircr.",
     "Journal of Propulsion and Power": "J. Propuls. Power",
     "Journal of Spacecraft and Rockets": "J. Spacecr. Rockets",
+    "Journal of the Aeronautical Sciences": "J. Aeronaut. Sci.",
+    "Journal of Aeronautical Sciences": "J. Aeronaut. Sci.",
+    "Journal of the Aerospace Sciences": "J. Aerosp. Sci.",
+    "Journal of Aerospace Sciences": "J. Aerosp. Sci.",
     "Journal of Turbulence": "J. Turbul.",
     "Experiments in Fluids": "Exp. Fluids",
     "Computers & Fluids": "Comput. Fluids",
@@ -937,6 +941,8 @@
     "Computer Methods in Applied Mechanics and Engineering": "Comput. Methods Appl. Mech. Eng.",
     "International Journal for Numerical Methods in Engineering": "Int. J. Numer. Methods Eng.",
     "International Journal for Numerical Methods in Fluids": "Int. J. Numer. Methods Fluids",
+    "Applied Mathematics and Mechanics": "Appl. Math. Mech.",
+    "Applied Mathematics and Mechanics (English Edition)": "Appl. Math. Mech.",
 
     // Chemistry & Chemical Engineering
     "Journal of the American Chemical Society": "J. Am. Chem. Soc.",
@@ -1016,6 +1022,14 @@
     ["gpu", "GPU"], ["cpu", "CPU"], ["ai", "AI"], ["ml", "ML"],
     ["cnn", "CNN"], ["rnn", "RNN"], ["lstm", "LSTM"], ["bert", "BERT"],
     ["llm", "LLM"], ["gpt", "GPT"], ["arxiv", "arXiv"],
+    ["reynolds", "Reynolds"], ["prandtl", "Prandtl"], ["mach", "Mach"],
+    ["stokes", "Stokes"], ["navier", "Navier"], ["fourier", "Fourier"],
+    ["euler", "Euler"], ["laplace", "Laplace"], ["rayleigh", "Rayleigh"],
+    ["taylor", "Taylor"], ["helmholtz", "Helmholtz"], ["boltzmann", "Boltzmann"],
+    ["weber", "Weber"], ["knudsen", "Knudsen"], ["peclet", "Peclet"],
+    ["nusselt", "Nusselt"], ["schmidt", "Schmidt"], ["froude", "Froude"],
+    ["strouhal", "Strouhal"], ["karman", "Karman"], ["poiseuille", "Poiseuille"],
+    ["couette", "Couette"], ["cauchy", "Cauchy"], ["marangoni", "Marangoni"],
     ["i", "I"], ["ii", "II"], ["iii", "III"], ["iv", "IV"], ["v", "V"],
     ["vi", "VI"], ["vii", "VII"], ["viii", "VIII"], ["ix", "IX"], ["x", "X"],
   ]);
@@ -1171,8 +1185,8 @@
 
   const NOTE_JUNK_KEY_RE = new RegExp(
     "(?:^|(?<=[\\s;,]))(?:" +
-      NOTE_JUNK_KEYS.map(k => escapeRegExp(k).replace(/_/g, "\\\\?_").replace(/ /g, "\\s+")).join("|") +
-      ")\\s*:",
+    NOTE_JUNK_KEYS.map(k => escapeRegExp(k).replace(/_/g, "\\\\?_").replace(/ /g, "\\s+")).join("|") +
+    ")\\s*:",
     "gi"
   );
 
@@ -1227,11 +1241,11 @@
     "a", "an", "the",
     "and", "but", "or", "nor", "for", "yet", "so",
     "although", "because", "since", "unless", "until", "while", "if",
-    "about", "above", "across", "after", "against", "along", "among", "around", "at", 
-    "before", "behind", "below", "beneath", "beside", "between", "beyond", "by", 
-    "down", "during", "except", "from", "in", "inside", "into", "like", "near", 
-    "of", "off", "on", "onto", "out", "outside", "over", "past", "through", 
-    "throughout", "to", "toward", "under", "underneath", "until", "up", "upon", 
+    "about", "above", "across", "after", "against", "along", "among", "around", "at",
+    "before", "behind", "below", "beneath", "beside", "between", "beyond", "by",
+    "down", "during", "except", "from", "in", "inside", "into", "like", "near",
+    "of", "off", "on", "onto", "out", "outside", "over", "past", "through",
+    "throughout", "to", "toward", "under", "underneath", "until", "up", "upon",
     "with", "within", "without"
   ]);
 
@@ -1329,8 +1343,10 @@
 
   function saveToCache(originalEntry, resolvedData) {
     if (typeof localStorage === "undefined" || !resolvedData) return;
-    const key = getCacheKey(originalEntry) || getCacheKey(resolvedData);
-    if (!key) return;
+    const key1 = getCacheKey(resolvedData);
+    const key2 = getCacheKey(originalEntry);
+    const keys = Array.from(new Set([key1, key2].filter(Boolean)));
+    if (keys.length === 0) return;
 
     const minimalPayload = {
       title: resolvedData.title || "",
@@ -1350,16 +1366,18 @@
       _cachedAt: Date.now(),
     };
 
-    try {
-      localStorage.setItem(key, JSON.stringify(minimalPayload));
-    } catch (e) {
-      if (e && (e.name === "QuotaExceededError" || e.name === "NS_ERROR_DOM_QUOTA_REACHED")) {
-        console.warn("localStorage quota exceeded. Purging old fixBib cache entries...");
-        purgeOldCache();
-        try {
-          localStorage.setItem(key, JSON.stringify(minimalPayload));
-        } catch (retryErr) {
-          console.error("Failed to save to cache after purge:", retryErr);
+    for (const key of keys) {
+      try {
+        localStorage.setItem(key, JSON.stringify(minimalPayload));
+      } catch (e) {
+        if (e && (e.name === "QuotaExceededError" || e.name === "NS_ERROR_DOM_QUOTA_REACHED")) {
+          console.warn("localStorage quota exceeded. Purging old fixBib cache entries...");
+          purgeOldCache();
+          try {
+            localStorage.setItem(key, JSON.stringify(minimalPayload));
+          } catch (retryErr) {
+            console.error("Failed to save to cache after purge:", retryErr);
+          }
         }
       }
     }
