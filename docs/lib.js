@@ -574,7 +574,7 @@
       number: item.issue || "",
       pages: item.page || "",
       doi: item.DOI || "",
-      publisher: item.publisher || "",
+      publisher: cleanPublisher(item.publisher || ""),
       url: item.URL || "",
       _source: "crossref",
     };
@@ -634,7 +634,7 @@
       number: biblio.issue || "",
       pages,
       doi,
-      publisher: source.host_organization_name || "",
+      publisher: cleanPublisher(source.host_organization_name || ""),
       url: doi ? `https://doi.org/${doi}` : (work.id || ""),
       _source: "openalex",
     };
@@ -841,6 +841,50 @@
     }
 
     return capitalizeVenue(clean);
+  }
+
+  const PUBLISHER_KNOWN_MAP = new Map([
+    ["cambridge university press (cup)", "Cambridge University Press"],
+    ["cambridge university press", "Cambridge University Press"],
+    ["american institute of aeronautics and astronautics (aiaa)", "American Institute of Aeronautics and Astronautics"],
+    ["american institute of aeronautics and astronautics", "American Institute of Aeronautics and Astronautics"],
+    ["institute of electrical and electronics engineers (ieee)", "IEEE"],
+    ["institute of electrical and electronics engineers", "IEEE"],
+    ["american physical society (aps)", "American Physical Society"],
+    ["american physical society", "American Physical Society"],
+    ["society for industrial and applied mathematics (siam)", "Society for Industrial and Applied Mathematics"],
+    ["oxford university press (oup)", "Oxford University Press"],
+    ["royal society of chemistry (rsc)", "Royal Society of Chemistry"],
+    ["american chemical society (acs)", "American Chemical Society"],
+    ["iop publishing (iop)", "IOP Publishing"],
+    ["iop publishing ltd", "IOP Publishing"],
+    ["elsevier bv", "Elsevier"],
+    ["elsevier inc.", "Elsevier"],
+    ["elsevier ltd", "Elsevier"],
+    ["springer science and business media llc", "Springer"],
+    ["springer nature", "Springer Nature"],
+    ["informa uk limited", "Taylor & Francis"],
+    ["john wiley & sons, inc.", "Wiley"],
+    ["john wiley & sons, ltd", "Wiley"],
+    ["wiley", "Wiley"]
+  ]);
+
+  function cleanPublisher(name) {
+    if (!name) return "";
+    let clean = name.trim();
+
+    const lower = clean.toLowerCase();
+    if (PUBLISHER_KNOWN_MAP.has(lower)) {
+      return PUBLISHER_KNOWN_MAP.get(lower);
+    }
+
+    // Strip parenthetical acronyms at the end (e.g. " (CUP)", " (AIAA)", " (IEEE)")
+    clean = clean.replace(/\s*\([A-Z0-9\s&-]+\)\s*$/i, "").trim();
+
+    // Strip common corporate entity suffixes at the end
+    clean = clean.replace(/\s+(BV|LLC|Inc\.?|Ltd\.?|GmbH|Co\.?|KG)\s*$/i, "").trim();
+
+    return clean;
   }
 
   const VENUE_ABBREVIATIONS = {
@@ -1555,6 +1599,7 @@
   exports.entryMatchesQuery = entryMatchesQuery;
   exports.titleCaseIfAllCaps = titleCaseIfAllCaps;
   exports.cleanVenue = cleanVenue;
+  exports.cleanPublisher = cleanPublisher;
   exports.capitalizeVenue = capitalizeVenue;
   exports.toTitleCase = toTitleCase;
   exports.toSentenceCase = toSentenceCase;

@@ -654,6 +654,21 @@ test("capitalizes general venue names with Title Case and preserves acronyms", (
 });
 
 // ═══════════════════════════════════════════════════════════════════════
+console.log("\n── cleanPublisher ──");
+
+test("strips parenthetical acronyms and corporate legal suffixes", () => {
+  assert.strictEqual(lib.cleanPublisher("Cambridge University Press (CUP)"), "Cambridge University Press");
+  assert.strictEqual(lib.cleanPublisher("American Institute of Aeronautics and Astronautics (AIAA)"), "American Institute of Aeronautics and Astronautics");
+  assert.strictEqual(lib.cleanPublisher("Institute of Electrical and Electronics Engineers (IEEE)"), "IEEE");
+  assert.strictEqual(lib.cleanPublisher("American Physical Society (APS)"), "American Physical Society");
+  assert.strictEqual(lib.cleanPublisher("Elsevier BV"), "Elsevier");
+  assert.strictEqual(lib.cleanPublisher("Springer Science and Business Media LLC"), "Springer");
+  assert.strictEqual(lib.cleanPublisher("Informa UK Limited"), "Taylor & Francis");
+  assert.strictEqual(lib.cleanPublisher(""), "");
+  assert.strictEqual(lib.cleanPublisher(null), "");
+});
+
+// ═══════════════════════════════════════════════════════════════════════
 console.log("\n── abbreviateVenue ──");
 
 test("abbreviates known venues", () => {

@@ -474,10 +474,22 @@ code {
   font-size: 0.9rem;
 }
 
-.upload-zone .icon {
-  font-size: 2.5rem;
-  margin-bottom: 0.5rem;
-  display: block;
+.upload-zone:hover .upload-icon,
+.upload-zone.dragover .upload-icon {
+  transform: translateY(-4px);
+  color: var(--accent);
+}
+
+.upload-icon-wrapper {
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.upload-icon {
+  color: var(--text);
+  transition: transform 0.2s ease, color 0.2s ease;
 }
 
 .upload-zone .label {
