@@ -2415,10 +2415,52 @@
   const cacheModalBackdrop = $("#cache-modal-backdrop");
   const cacheModalClose = $("#cache-modal-close");
   const storageStatsChip = $("#storage-stats-chip");
+  const btnSaveAllCache = $("#btn-save-all-cache");
   const btnExportCache = $("#btn-export-cache");
   const btnImportCache = $("#btn-import-cache");
   const btnClearCache = $("#btn-clear-cache");
   const cacheFileInput = $("#cache-file-input");
+
+  btnSaveAllCache?.addEventListener("click", () => {
+    if (!results || results.length === 0) {
+      alert("No entries loaded to save to cache.");
+      return;
+    }
+
+    let savedCount = 0;
+    results.forEach((r, idx) => {
+      const effective = getEffectiveEntry(idx);
+      if (!effective) return;
+
+      B.saveToCache(parsedEntries[idx], effective);
+
+      r.isCached = true;
+      r.found = { ...effective, isCached: true };
+      r._isSavedCache = true;
+
+      const cmp = B.compareEntry(parsedEntries[idx], r.found);
+      r.status = cmp.status;
+      r.title_score = cmp.title_score;
+      r.field_diffs = cmp.field_diffs;
+      r.suggested = cmp.suggested;
+
+      renderEntryCard(r);
+      savedCount++;
+    });
+
+    updateDynamicSummary();
+    updateStorageStats();
+    updatePreview();
+    openCacheModal();
+
+    const origHTML = btnSaveAllCache.innerHTML;
+    btnSaveAllCache.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Saved ${savedCount} ${savedCount === 1 ? "Entry" : "Entries"}!`;
+    btnSaveAllCache.classList.add("is-updated");
+    setTimeout(() => {
+      btnSaveAllCache.innerHTML = origHTML;
+      btnSaveAllCache.classList.remove("is-updated");
+    }, 2200);
+  });
 
   function openCacheModal() {
     if (!cacheModalBackdrop) return;

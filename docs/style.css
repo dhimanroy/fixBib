@@ -768,6 +768,21 @@ code {
   font-family: inherit;
 }
 
+.cache-btn-save-all {
+  background: var(--green-bg);
+  color: var(--green);
+  border: 1px solid var(--green-border);
+}
+.cache-btn-save-all:hover {
+  background: rgba(16, 185, 129, 0.22);
+  border-color: var(--green);
+}
+.cache-btn-save-all.is-updated {
+  background: var(--green);
+  color: #fff;
+  border-color: var(--green);
+}
+
 .cache-btn-export {
   background: var(--accent);
   color: #fff;
