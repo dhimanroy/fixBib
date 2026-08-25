@@ -9,9 +9,37 @@
   const TITLE_MATCH_THRESHOLD = 85;
   const MIN_TITLE_SIM = 70;
   const COMPARED_FIELDS = [
-    "ENTRYTYPE", "author", "year", "journal", "booktitle",
+    "ENTRYTYPE", "author", "year", "month", "journal", "booktitle",
     "volume", "number", "pages", "doi", "publisher", "howpublished",
   ];
+
+  const MONTH_MAP = new Map([
+    ["1", "January"], ["01", "January"], ["jan", "January"], ["january", "January"],
+    ["2", "February"], ["02", "February"], ["feb", "February"], ["february", "February"],
+    ["3", "March"], ["03", "March"], ["mar", "March"], ["march", "March"],
+    ["4", "April"], ["04", "April"], ["apr", "April"], ["april", "April"],
+    ["5", "May"], ["05", "May"], ["may", "May"],
+    ["6", "June"], ["06", "June"], ["jun", "June"], ["june", "June"],
+    ["7", "July"], ["07", "July"], ["jul", "July"], ["july", "July"],
+    ["8", "August"], ["08", "August"], ["aug", "August"], ["august", "August"],
+    ["9", "September"], ["09", "September"], ["sep", "September"], ["september", "September"],
+    ["10", "October"], ["oct", "October"], ["october", "October"],
+    ["11", "November"], ["nov", "November"], ["november", "November"],
+    ["12", "December"], ["dec", "December"], ["december", "December"],
+  ]);
+
+  function cleanMonth(val) {
+    if (val === undefined || val === null || val === "") return "";
+    const str = val.toString().trim().toLowerCase();
+    if (!str) return "";
+    if (MONTH_MAP.has(str)) return MONTH_MAP.get(str);
+    const match = str.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b/);
+    if (match) {
+      const abbr = match[1];
+      if (MONTH_MAP.has(abbr)) return MONTH_MAP.get(abbr);
+    }
+    return str.charAt(0).toUpperCase() + str.slice(1);
+  }
 
   // ─── LaTeX helpers ───────────────────────────────────────────────────
   const LATEX_ACCENT_MAP = {
@@ -189,7 +217,7 @@
 
   function entriesToBib(entries) {
     const lines = [];
-    const fieldOrder = ["title", "author", "journal", "booktitle", "year", "volume", "number", "pages", "doi", "howpublished", "publisher"];
+    const fieldOrder = ["title", "author", "journal", "booktitle", "year", "month", "volume", "number", "pages", "doi", "howpublished", "publisher"];
     const indentPre = 4;
     const indentPost = 16;
     for (const entry of entries) {
@@ -561,17 +589,20 @@
       return f ? `${f}, ${g}`.replace(/, $/, "") : "";
     }).filter(Boolean);
 
-    const dp = item["published-print"] || item["published-online"] || {};
+    const dp = item["published-print"] || item["published-online"] || item["issued"] || item["created"] || {};
     const year = dp["date-parts"]?.[0]?.[0]?.toString() || "";
+    const month = cleanMonth(dp["date-parts"]?.[0]?.[1]);
     const container = item["container-title"] || [];
+    const issue = item.issue || item["journal-issue"]?.issue || "";
 
     return {
       title: (item.title || [""])[0],
       author: titleCaseIfAllCaps(authors.join(" and ")),
       year,
+      month,
       journal: cleanVenue(container[0] || ""),
       volume: item.volume || "",
-      number: item.issue || "",
+      number: issue,
       pages: item.page || "",
       doi: item.DOI || "",
       publisher: cleanPublisher(item.publisher || ""),
@@ -595,12 +626,17 @@
     // preprints — their `year` is the submission year, not the published one.
     if (!venue && ext.ArXiv) venue = "arXiv";
 
+    const pubDate = paper.publicationDate || "";
+    const month = cleanMonth(pubDate ? pubDate.split("-")[1] : "");
+    const issue = paper.issue || (pv && typeof pv === "object" ? pv.issue : null) || "";
+
     return {
       title: paper.title || "",
       author: titleCaseIfAllCaps(authors.join(" and ")),
       year: (paper.year || "").toString(),
+      month,
       journal: cleanVenue(venue),
-      volume: "", number: "", pages: "",
+      volume: "", number: issue, pages: "",
       doi: ext.DOI || "",
       publisher: "",
       url: ext.DOI ? `https://doi.org/${ext.DOI}` : "",
@@ -625,10 +661,14 @@
     const rawDoi = work.doi || work.ids?.doi || "";
     const doi = (rawDoi || "").replace(/^https?:\/\/(dx\.)?doi\.org\//i, "");
 
+    const pubDate = work.publication_date || "";
+    const month = cleanMonth(pubDate ? pubDate.split("-")[1] : "");
+
     return {
       title: work.title || work.display_name || "",
       author: titleCaseIfAllCaps(authors.join(" and ")),
       year: (work.publication_year || "").toString(),
+      month,
       journal: cleanVenue(source.display_name || ""),
       volume: biblio.volume || "",
       number: biblio.issue || "",
@@ -656,7 +696,7 @@
   // ─── Preprint awareness ──────────────────────────────────────────────
   // Fields where the peer-reviewed record should win when merged with a
   // preprint version of the same paper.
-  const PUBLISHED_PREFERRED_FIELDS = ["year", "journal", "volume", "number", "pages", "publisher", "doi"];
+  const PUBLISHED_PREFERRED_FIELDS = ["year", "month", "journal", "volume", "number", "pages", "publisher", "doi"];
   // Preprint and published versions of the same paper rarely differ by more
   // than a couple of years; allow this gap when cross-referencing sources.
   const PREPRINT_YEAR_TOLERANCE = 2;
@@ -1396,6 +1436,7 @@
       title: resolvedData.title || "",
       author: resolvedData.author || "",
       year: (resolvedData.year || "").toString(),
+      month: resolvedData.month || "",
       journal: resolvedData.journal || "",
       booktitle: resolvedData.booktitle || "",
       volume: resolvedData.volume || "",
@@ -1498,6 +1539,7 @@
         title: sanitizeStringField(itemObj.title),
         author: sanitizeStringField(itemObj.author),
         year: sanitizeStringField(itemObj.year),
+        month: sanitizeStringField(itemObj.month),
         journal: sanitizeStringField(itemObj.journal),
         booktitle: sanitizeStringField(itemObj.booktitle),
         volume: sanitizeStringField(itemObj.volume),
@@ -1600,6 +1642,7 @@
   exports.titleCaseIfAllCaps = titleCaseIfAllCaps;
   exports.cleanVenue = cleanVenue;
   exports.cleanPublisher = cleanPublisher;
+  exports.cleanMonth = cleanMonth;
   exports.capitalizeVenue = capitalizeVenue;
   exports.toTitleCase = toTitleCase;
   exports.toSentenceCase = toSentenceCase;

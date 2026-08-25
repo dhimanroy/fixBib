@@ -669,6 +669,21 @@ test("strips parenthetical acronyms and corporate legal suffixes", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
+console.log("\n── cleanMonth ──");
+
+test("normalizes numeric and string month values to full capitalized month names", () => {
+  assert.strictEqual(lib.cleanMonth("5"), "May");
+  assert.strictEqual(lib.cleanMonth("05"), "May");
+  assert.strictEqual(lib.cleanMonth("May"), "May");
+  assert.strictEqual(lib.cleanMonth("jul"), "July");
+  assert.strictEqual(lib.cleanMonth("July"), "July");
+  assert.strictEqual(lib.cleanMonth("January"), "January");
+  assert.strictEqual(lib.cleanMonth("11"), "November");
+  assert.strictEqual(lib.cleanMonth(""), "");
+  assert.strictEqual(lib.cleanMonth(null), "");
+});
+
+// ═══════════════════════════════════════════════════════════════════════
 console.log("\n── abbreviateVenue ──");
 
 test("abbreviates known venues", () => {
