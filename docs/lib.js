@@ -41,6 +41,31 @@
     return str.charAt(0).toUpperCase() + str.slice(1);
   }
 
+  const MONTH_ABBR_MAP = new Map([
+    ["january", "jan"], ["jan", "jan"], ["1", "jan"], ["01", "jan"],
+    ["february", "feb"], ["feb", "feb"], ["2", "feb"], ["02", "feb"],
+    ["march", "mar"], ["mar", "mar"], ["3", "mar"], ["03", "mar"],
+    ["april", "apr"], ["apr", "apr"], ["4", "apr"], ["04", "apr"],
+    ["may", "may"], ["5", "may"], ["05", "may"],
+    ["june", "jun"], ["jun", "jun"], ["6", "jun"], ["06", "jun"],
+    ["july", "jul"], ["jul", "jul"], ["7", "jul"], ["07", "jul"],
+    ["august", "aug"], ["aug", "aug"], ["8", "aug"], ["08", "aug"],
+    ["september", "sep"], ["sep", "sep"], ["9", "sep"], ["09", "sep"],
+    ["october", "oct"], ["oct", "oct"], ["10", "oct"],
+    ["november", "nov"], ["nov", "nov"], ["11", "nov"],
+    ["december", "dec"], ["dec", "dec"], ["12", "dec"],
+  ]);
+
+  function abbreviateMonth(val) {
+    if (val === undefined || val === null || val === "") return "";
+    const str = val.toString().trim().toLowerCase();
+    if (!str) return "";
+    if (MONTH_ABBR_MAP.has(str)) return MONTH_ABBR_MAP.get(str);
+    const match = str.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b/);
+    if (match) return match[1];
+    return str;
+  }
+
   // ─── LaTeX helpers ───────────────────────────────────────────────────
   const LATEX_ACCENT_MAP = {
     "\\'a": "á", "\\'e": "é", "\\'i": "í", "\\'o": "ó", "\\'u": "ú",
@@ -589,7 +614,7 @@
       return f ? `${f}, ${g}`.replace(/, $/, "") : "";
     }).filter(Boolean);
 
-    const dp = item["published-print"] || item["published-online"] || item["issued"] || item["created"] || {};
+    const dp = item["published-print"] || item["journal-issue"]?.["published-print"] || item["published-online"] || item["issued"] || item["created"] || {};
     const year = dp["date-parts"]?.[0]?.[0]?.toString() || "";
     const month = cleanMonth(dp["date-parts"]?.[0]?.[1]);
     const container = item["container-title"] || [];
@@ -762,6 +787,10 @@
     // (secondary), trust the published venue for bibliographic fields —
     // above all `year`, which on a preprint is the earlier submission year.
     if (isPreprint(primary) && !isPreprint(secondary)) {
+      for (const f of PUBLISHED_PREFERRED_FIELDS) {
+        if (secondary[f]) merged[f] = secondary[f];
+      }
+    } else if (secondary._source === "crossref" || (secondary._source && secondary._source.includes("crossref"))) {
       for (const f of PUBLISHED_PREFERRED_FIELDS) {
         if (secondary[f]) merged[f] = secondary[f];
       }
@@ -1643,6 +1672,7 @@
   exports.cleanVenue = cleanVenue;
   exports.cleanPublisher = cleanPublisher;
   exports.cleanMonth = cleanMonth;
+  exports.abbreviateMonth = abbreviateMonth;
   exports.capitalizeVenue = capitalizeVenue;
   exports.toTitleCase = toTitleCase;
   exports.toSentenceCase = toSentenceCase;

@@ -436,6 +436,17 @@ test("handles missing fields gracefully", () => {
   assert.strictEqual(result.year, "");
 });
 
+test("prioritizes published-print over published-online date", () => {
+  const item = {
+    title: ["Direct numerical simulation"],
+    "published-print": { "date-parts": [[2022, 4, 25]] },
+    "published-online": { "date-parts": [[2022, 2, 23]] },
+  };
+  const result = lib.crossrefToStandard(item);
+  assert.strictEqual(result.year, "2022");
+  assert.strictEqual(result.month, "April");
+});
+
 // ═══════════════════════════════════════════════════════════════════════
 console.log("\n── ssToStandard ──");
 
@@ -681,6 +692,19 @@ test("normalizes numeric and string month values to full capitalized month names
   assert.strictEqual(lib.cleanMonth("11"), "November");
   assert.strictEqual(lib.cleanMonth(""), "");
   assert.strictEqual(lib.cleanMonth(null), "");
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+console.log("\n── abbreviateMonth ──");
+
+test("abbreviates full or numeric month strings to 3-letter lowercase BibTeX macros", () => {
+  assert.strictEqual(lib.abbreviateMonth("April"), "apr");
+  assert.strictEqual(lib.abbreviateMonth("July"), "jul");
+  assert.strictEqual(lib.abbreviateMonth("5"), "may");
+  assert.strictEqual(lib.abbreviateMonth("01"), "jan");
+  assert.strictEqual(lib.abbreviateMonth("November"), "nov");
+  assert.strictEqual(lib.abbreviateMonth(""), "");
+  assert.strictEqual(lib.abbreviateMonth(null), "");
 });
 
 // ═══════════════════════════════════════════════════════════════════════

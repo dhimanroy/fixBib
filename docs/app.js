@@ -134,7 +134,7 @@
       "query.bibliographic": title,
       rows: "5",
       mailto: "yornamihd@gmail.com",
-      select: "DOI,title,author,issued,container-title,volume,issue,page,publisher,type",
+      select: "DOI,title,author,issued,published-print,published-online,container-title,volume,issue,page,publisher,type",
     });
     return (data?.message?.items || []).map(B.crossrefToStandard);
   }
@@ -809,6 +809,8 @@
             action: defaultAction,
             value: d.found || "",
           };
+        } else if (fieldEdits[idx][d.field].action === "found") {
+          fieldEdits[idx][d.field].value = d.found || "";
         }
         const fe = fieldEdits[idx][d.field];
         const currentAction = fe.action;
@@ -1073,6 +1075,7 @@
     btn.disabled = true;
     btn.textContent = "Refetching…";
 
+    fieldEdits[idx] = {};
     const entry = parsedEntries[idx];
     let found = null, inconclusive = false;
     try {
@@ -1823,6 +1826,7 @@
         if (out.title) out.title = B.toSentenceCase(out.title);
       } else if (s.pubFormat === "aiaa") {
         if (out.title) out.title = B.toTitleCase(out.title);
+        if (out.month) out.month = B.abbreviateMonth(out.month);
       } else if (s.pubFormat === "custom") {
         if (s.customTitleCase === "sentence") {
           if (out.title) out.title = B.toSentenceCase(out.title);
