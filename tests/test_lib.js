@@ -708,6 +708,20 @@ test("abbreviates full or numeric month strings to 3-letter lowercase BibTeX mac
 });
 
 // ═══════════════════════════════════════════════════════════════════════
+console.log("\n── formatIeeeMonth ──");
+
+test("formats month for IEEE style (capitalized abbreviation with period)", () => {
+  assert.strictEqual(lib.formatIeeeMonth("September"), "Sep.");
+  assert.strictEqual(lib.formatIeeeMonth("sep"), "Sep.");
+  assert.strictEqual(lib.formatIeeeMonth("9"), "Sep.");
+  assert.strictEqual(lib.formatIeeeMonth("09"), "Sep.");
+  assert.strictEqual(lib.formatIeeeMonth("May"), "May");
+  assert.strictEqual(lib.formatIeeeMonth("January"), "Jan.");
+  assert.strictEqual(lib.formatIeeeMonth(""), "");
+  assert.strictEqual(lib.formatIeeeMonth(null), "");
+});
+
+// ═══════════════════════════════════════════════════════════════════════
 console.log("\n── abbreviateVenue ──");
 
 test("abbreviates known venues", () => {
@@ -757,6 +771,25 @@ test("converts title to Sentence Case properly", () => {
   assert.strictEqual(lib.toSentenceCase("Pressure Fluctuations in a Supersonic Boundary Layer: A Direct Study"), "Pressure fluctuations in a supersonic boundary layer: A direct study");
   assert.strictEqual(lib.toSentenceCase("Direct numerical simulation of {DNS} and LES"), "Direct numerical simulation of {DNS} and LES");
   assert.strictEqual(lib.toSentenceCase("Effects of the reynolds number on the mean skin friction decomposition in turbulent channel flows"), "Effects of the Reynolds number on the mean skin friction decomposition in turbulent channel flows");
+});
+
+test("converts title to Sentence Case with capitalization enclosure for IEEE", () => {
+  assert.strictEqual(
+    lib.toSentenceCase("On Bessel functions and Lipschitz-Hankel integrals for IEEE applications", true),
+    "On {Bessel} functions and {Lipschitz-Hankel} integrals for {IEEE} applications"
+  );
+  assert.strictEqual(
+    lib.toSentenceCase("Direct numerical simulation of {DNS} and LES with CFD in 3D", true),
+    "Direct numerical simulation of {DNS} and {LES} with {CFD} in {3D}"
+  );
+});
+
+test("formats 3-letter month as unquoted macro in entriesToBib and parses it back", () => {
+  const bib = lib.entriesToBib([{ ENTRYTYPE: "article", ID: "test", month: "jul" }]);
+  assert.ok(bib.includes("month           = jul,"));
+  assert.ok(!bib.includes("month           = {jul},"));
+  const parsed = lib.parseBib(bib);
+  assert.strictEqual(parsed[0].month, "jul");
 });
 
 // ═══════════════════════════════════════════════════════════════════════

@@ -478,9 +478,19 @@
           <div class="sub-option visible" id="pub-format-wrap">
             <label class="radio-label"><input type="radio" name="pub-format" value="default" checked /> As Input</label>
             <label class="radio-label"><input type="radio" name="pub-format" value="aiaa" /> AIAA </label>
+            <label class="radio-label"><input type="radio" name="pub-format" value="ieee" /> IEEE </label>
             <label class="radio-label"><input type="radio" name="pub-format" value="jfm_pof" /> JFM or PoF</label>
             <label class="radio-label"><input type="radio" name="pub-format" value="custom" id="pub-format-custom" />
               Custom</label>
+          </div>
+          <div class="custom-pub-controls" id="ieee-pub-controls" style="display: none;">
+            <div class="custom-control-row">
+              <label class="option-toggle"
+                style="font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+                <input type="checkbox" id="opt-ieee-doi-note" checked />
+                <span>Put DOI in <code>note</code> field (for IEEEtran LaTeX templates)</span>
+              </label>
+            </div>
           </div>
           <div class="custom-pub-controls" id="custom-pub-controls" style="display: none;">
             <div class="custom-control-row">

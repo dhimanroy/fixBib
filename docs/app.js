@@ -1806,7 +1806,7 @@
       if (out.journal) out.journal = B.cleanVenue(out.journal);
       if (out.booktitle) out.booktitle = B.cleanVenue(out.booktitle);
 
-      if (s.pubFormat === "jfm_pof" || s.pubFormat === "jfm" || s.pubFormat === "pof") {
+      if (s.pubFormat === "jfm_pof" || s.pubFormat === "jfm" || s.pubFormat === "pof" || s.pubFormat === "ieee") {
         if (out.journal) out.journal = B.abbreviateVenue(out.journal);
         if (out.booktitle) out.booktitle = B.abbreviateVenue(out.booktitle);
       } else if (s.pubFormat === "aiaa") {
@@ -1827,6 +1827,9 @@
       } else if (s.pubFormat === "aiaa") {
         if (out.title) out.title = B.toTitleCase(out.title);
         if (out.month) out.month = B.cleanMonth(out.month); //B.abbreviateMonth(out.month);
+      } else if (s.pubFormat === "ieee") {
+        if (out.title) out.title = B.toSentenceCase(out.title, true);
+        if (out.month) out.month = B.abbreviateMonth(out.month);
       } else if (s.pubFormat === "custom") {
         if (s.customTitleCase === "sentence") {
           if (out.title) out.title = B.toSentenceCase(out.title);
@@ -1837,7 +1840,7 @@
 
       const aiaaPaperNum = B.getAiaaPaperNumber(out) || B.getAiaaPaperNumber(r?.suggested);
       if (aiaaPaperNum) {
-        if (s.pubFormat === "aiaa") {
+        if (s.pubFormat === "aiaa" || s.pubFormat === "ieee") {
           out.ENTRYTYPE = "misc";
           out.howpublished = "AIAA Paper " + aiaaPaperNum;
           delete out.journal;
@@ -1867,7 +1870,22 @@
         out.ID = B.generateCitationKey(out);
       }
 
-      return s.cleanNotes ? B.cleanEntryNotes(out) : out;
+      if (s.cleanNotes) {
+        out = B.cleanEntryNotes(out);
+      }
+
+      if (s.pubFormat === "ieee" && s.ieeeDoiInNote && out.doi) {
+        const cleanDoi = out.doi.trim().replace(/^https?:\/\/(dx\.)?doi\.org\//i, "");
+        const doiLink = `doi: \\href{https://doi.org/${cleanDoi}}{${cleanDoi}}`;
+        if (!out.note) {
+          out.note = doiLink;
+        } else if (!out.note.toLowerCase().includes(cleanDoi.toLowerCase())) {
+          out.note = out.note.replace(/[.,\s]+$/, "") + ", " + doiLink;
+        }
+        delete out.doi;
+      }
+
+      return out;
     }).filter(Boolean);
 
     if (s.removeDuplicates) {
@@ -2045,11 +2063,20 @@
     el.addEventListener("change", updatePreview));
 
   function updateCustomPubControlsVisibility() {
+    const val = (document.querySelector('input[name="pub-format"]:checked') || {}).value;
     const customControls = document.getElementById("custom-pub-controls");
-    const isCustom = (document.querySelector('input[name="pub-format"]:checked') || {}).value === "custom";
+    const ieeeControls = document.getElementById("ieee-pub-controls");
     if (customControls) {
-      customControls.style.display = isCustom ? "flex" : "none";
+      customControls.style.display = val === "custom" ? "flex" : "none";
     }
+    if (ieeeControls) {
+      ieeeControls.style.display = val === "ieee" ? "flex" : "none";
+    }
+  }
+
+  const optIeeeDoiNote = document.getElementById("opt-ieee-doi-note");
+  if (optIeeeDoiNote) {
+    optIeeeDoiNote.addEventListener("change", updatePreview);
   }
 
   $$('input[name="pub-format"]').forEach(el =>
@@ -2074,6 +2101,7 @@
     const pubFormat = (document.querySelector('input[name="pub-format"]:checked') || {}).value || "default";
     const customTitleCase = (document.getElementById("custom-title-case") || {}).value || "sentence";
     const customJournalFormat = (document.getElementById("custom-journal-format") || {}).value || "abbreviated";
+    const ieeeDoiInNote = !!(document.getElementById("opt-ieee-doi-note") || {}).checked;
 
     return {
       removeDuplicates: optRemoveDuplicates.checked,
@@ -2085,6 +2113,7 @@
       pubFormat,
       customTitleCase,
       customJournalFormat,
+      ieeeDoiInNote,
       updateKeys: optUpdateKeys.checked,
     };
   }

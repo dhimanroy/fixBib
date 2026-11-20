@@ -66,6 +66,34 @@
     return str;
   }
 
+  const IEEE_MONTH_MAP = new Map([
+    ["1", "Jan."], ["01", "Jan."], ["jan", "Jan."], ["january", "Jan."],
+    ["2", "Feb."], ["02", "Feb."], ["feb", "Feb."], ["february", "Feb."],
+    ["3", "Mar."], ["03", "Mar."], ["mar", "Mar."], ["march", "Mar."],
+    ["4", "Apr."], ["04", "Apr."], ["apr", "Apr."], ["april", "Apr."],
+    ["5", "May"],  ["05", "May"],  ["may", "May"],
+    ["6", "Jun."], ["06", "Jun."], ["jun", "Jun."], ["june", "Jun."],
+    ["7", "Jul."], ["07", "Jul."], ["jul", "Jul."], ["july", "Jul."],
+    ["8", "Aug."], ["08", "Aug."], ["aug", "Aug."], ["august", "Aug."],
+    ["9", "Sep."], ["09", "Sep."], ["sep", "Sep."], ["september", "Sep."], ["sept", "Sep."],
+    ["10", "Oct."], ["oct", "Oct."], ["october", "Oct."],
+    ["11", "Nov."], ["nov", "Nov."], ["november", "Nov."],
+    ["12", "Dec."], ["dec", "Dec."], ["december", "Dec."],
+  ]);
+
+  function formatIeeeMonth(val) {
+    if (val === undefined || val === null || val === "") return "";
+    const str = val.toString().trim().toLowerCase().replace(/\.$/, "");
+    if (!str) return "";
+    if (IEEE_MONTH_MAP.has(str)) return IEEE_MONTH_MAP.get(str);
+    const match = str.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\b/);
+    if (match) {
+      const key = match[1] === "sept" ? "sep" : match[1];
+      return IEEE_MONTH_MAP.get(key) || str;
+    }
+    return str.charAt(0).toUpperCase() + str.slice(1);
+  }
+
   // ─── LaTeX helpers ───────────────────────────────────────────────────
   const LATEX_ACCENT_MAP = {
     "\\'a": "á", "\\'e": "é", "\\'i": "í", "\\'o": "ó", "\\'u": "ú",
@@ -183,6 +211,15 @@
     return { value: m[1], next };
   }
 
+  function extractMacroFieldValue(str, start) {
+    const m = /^([a-zA-Z0-9_:-]+)/.exec(str.slice(start));
+    if (!m) return { value: "", next: start };
+    let next = start + m[1].length;
+    next = skipWhitespace(str, next);
+    if (str[next] === ",") next = skipWhitespace(str, next + 1);
+    return { value: m[1], next };
+  }
+
   function parseEntryFields(body) {
     const fields = {};
     let i = skipWhitespace(body, 0);
@@ -198,6 +235,7 @@
       if (body[i] === "{") ext = extractBracedFieldValue(body, i);
       else if (body[i] === '"') ext = extractQuotedFieldValue(body, i);
       else if (/\d/.test(body[i])) ext = extractNumberFieldValue(body, i);
+      else if (/[a-zA-Z]/.test(body[i])) ext = extractMacroFieldValue(body, i);
       else break;
 
       fields[key] = ext.value.replace(/\s*\n\s*/g, " ").trim();
@@ -257,6 +295,9 @@
         const nameLen = k.length;
         const padLen = Math.max(1, indentPost - nameLen);
         const padding = " ".repeat(padLen);
+        if (k === "month" && /^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)$/i.test(String(v).trim())) {
+          return `${prefix}${k}${padding}= ${String(v).trim().toLowerCase()},`;
+        }
         return `${prefix}${k}${padding}= {${v}},`;
       }
 
@@ -1143,6 +1184,7 @@
     ["nusselt", "Nusselt"], ["schmidt", "Schmidt"], ["froude", "Froude"],
     ["strouhal", "Strouhal"], ["karman", "Karman"], ["poiseuille", "Poiseuille"],
     ["couette", "Couette"], ["cauchy", "Cauchy"], ["marangoni", "Marangoni"],
+    ["bessel", "Bessel"], ["lipschitz", "Lipschitz"], ["hankel", "Hankel"],
     ["i", "I"], ["ii", "II"], ["iii", "III"], ["iv", "IV"], ["v", "V"],
     ["vi", "VI"], ["vii", "VII"], ["viii", "VIII"], ["ix", "IX"], ["x", "X"],
   ]);
@@ -1212,7 +1254,7 @@
     return tokens.join("");
   }
 
-  function toSentenceCaseWord(word, isFirst, afterMajorPunctuation) {
+  function toSentenceCaseWord(word, isFirst, afterMajorPunctuation, protectCapitalization = false) {
     if (!word) return "";
     if ((word.startsWith("{") && word.endsWith("}")) || word.includes("$") || word.startsWith("\\")) {
       return word;
@@ -1226,16 +1268,22 @@
     let resultCore = core;
 
     if (TITLE_KNOWN_ACRONYMS.has(lower)) {
-      resultCore = TITLE_KNOWN_ACRONYMS.get(lower);
+      const canonical = TITLE_KNOWN_ACRONYMS.get(lower);
+      resultCore = protectCapitalization ? `{${canonical}}` : canonical;
     } else if (core === core.toUpperCase() && /[A-Z]/.test(core) && core.length > 1) {
-      resultCore = core;
+      resultCore = protectCapitalization ? `{${core}}` : core;
     } else if (/[a-z][A-Z]/.test(core)) {
-      resultCore = core;
+      resultCore = protectCapitalization ? `{${core}}` : core;
     } else if (core.includes("-")) {
-      resultCore = core
-        .split("-")
-        .map((part, idx) => toSentenceCaseWord(part, isFirst && idx === 0, false))
-        .join("-");
+      const parts = core.split("-");
+      const hasProperPart = parts.some(p => TITLE_KNOWN_ACRONYMS.has(p.toLowerCase()) || (p.length > 1 && p === p.toUpperCase()) || /[a-z][A-Z]/.test(p));
+      if (protectCapitalization && (hasProperPart || /^[A-Z][a-z]+-[A-Z]/.test(core))) {
+        resultCore = `{${core}}`;
+      } else {
+        resultCore = parts
+          .map((part, idx) => toSentenceCaseWord(part, isFirst && idx === 0, false, protectCapitalization))
+          .join("-");
+      }
     } else if (isFirst || afterMajorPunctuation) {
       resultCore = lower.charAt(0).toUpperCase() + lower.slice(1);
     } else {
@@ -1245,7 +1293,7 @@
     return prefix + resultCore + suffix;
   }
 
-  function toSentenceCase(title) {
+  function toSentenceCase(title, protectCapitalization = false) {
     if (!title) return "";
     const tokens = title.split(/(\s+)/);
     const nonSpaceIndices = [];
@@ -1261,7 +1309,7 @@
       const i = nonSpaceIndices[idx];
       const isFirst = (idx === 0);
 
-      tokens[i] = toSentenceCaseWord(tokens[i], isFirst, afterPunct);
+      tokens[i] = toSentenceCaseWord(tokens[i], isFirst, afterPunct, protectCapitalization);
 
       const raw = tokens[i];
       afterPunct = /[:\.\?!-]\s*$/.test(raw) || /:$/.test(raw);
@@ -1673,6 +1721,7 @@
   exports.cleanPublisher = cleanPublisher;
   exports.cleanMonth = cleanMonth;
   exports.abbreviateMonth = abbreviateMonth;
+  exports.formatIeeeMonth = formatIeeeMonth;
   exports.capitalizeVenue = capitalizeVenue;
   exports.toTitleCase = toTitleCase;
   exports.toSentenceCase = toSentenceCase;
