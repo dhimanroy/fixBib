@@ -27,8 +27,8 @@
   // request time, and consecutive failures used to trip a short-circuit breaker.
   const rateBuckets = {
     ss: { delay: 500, min: 300, max: 3000, last: 0, ok: 0, failures: 0, disabled: false },
-    cr: { delay: 100, min: 50,  max: 2000, last: 0, ok: 0, failures: 0, disabled: false },
-    oa: { delay: 100, min: 50,  max: 2000, last: 0, ok: 0, failures: 0, disabled: false },
+    cr: { delay: 100, min: 50, max: 2000, last: 0, ok: 0, failures: 0, disabled: false },
+    oa: { delay: 100, min: 50, max: 2000, last: 0, ok: 0, failures: 0, disabled: false },
   };
 
   function resetCircuitBreakers() {
@@ -68,7 +68,7 @@
   async function fetchJSON(url, params, { retries = MAX_RETRIES, is404Ok = false } = {}) {
     const source = url.includes("semanticscholar.org") ? "ss"
       : url.includes("openalex.org") ? "oa"
-      : "cr";
+        : "cr";
     const bucket = rateBuckets[source] || rateBuckets.cr;
 
     if (bucket.disabled) {
@@ -339,9 +339,9 @@
 
     // Extra clean: strip punctuation/braces and math/LaTeX leftovers to hunt for missing DOI
     let extraClean = cleanTitle.replace(/[\{\}\(\)\[\]\-\_\:\;\,\.\?\!\'\"]/g, " ")
-                               .replace(/[\$\\+\\*\\^\\/_~=]/g, "")
-                               .replace(/\s+/g, " ")
-                               .trim();
+      .replace(/[\$\\+\\*\\^\\/_~=]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
     if (extraClean && extraClean !== cleanTitle) {
       const retryFound = await lookupPaper(extraClean, cleanTitle);
       if (retryFound) {
@@ -1826,7 +1826,7 @@
         if (out.title) out.title = B.toSentenceCase(out.title);
       } else if (s.pubFormat === "aiaa") {
         if (out.title) out.title = B.toTitleCase(out.title);
-        if (out.month) out.month = B.abbreviateMonth(out.month);
+        if (out.month) out.month = B.cleanMonth(out.month); //B.abbreviateMonth(out.month);
       } else if (s.pubFormat === "custom") {
         if (s.customTitleCase === "sentence") {
           if (out.title) out.title = B.toSentenceCase(out.title);
